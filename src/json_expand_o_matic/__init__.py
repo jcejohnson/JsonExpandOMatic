@@ -94,7 +94,7 @@ class JsonExpandOMatic:
 
       keys = sorted(data[key].keys())
       for k in keys:
-        v = data[key][k]
+        # v = data[key][k]
         self.logger.debug(' ' * indent + k)
         self._expand(path=os.path.join(path, str(key)),
                      key=k, data=data[key], ref=key,
@@ -107,7 +107,7 @@ class JsonExpandOMatic:
 
     try:
       os.rmdir(path)
-    except Exception as e:
+    except Exception:
       pass
 
     return data

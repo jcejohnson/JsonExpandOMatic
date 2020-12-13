@@ -1,9 +1,11 @@
+import unittest
 
 import json
 import jsonref
-import logging
 import os
-import sys
+import shutil
+import shutil
+import tempfile
 
 from json_expand_o_matic import JsonExpandOMatic
 
@@ -48,60 +50,59 @@ raw_data = {
     }
 }
 
-# create logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+data_path = tempfile.mkdtemp()
 
-# create formatter
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# add formatter to ch
-ch.setFormatter(formatter)
+class TestSimple(unittest.TestCase):
 
-# add ch to logger
-logger.addHandler(ch)
+  def test_all_things(self):
+    try:
+      return self._test_all_things()
+    finally:
+      shutil.rmtree(data_path)
 
-data_path = sys.argv[1] if len(sys.argv) > 1 else '.'
+  def _test_all_things(self):
 
-# Make two copies of our raw data.
-# One will be our test victim, the other will be for validation.
-test_data = json.loads(json.dumps(raw_data))
-original_data = json.loads(json.dumps(raw_data))
-assert test_data == original_data
+    # Make two copies of our raw data.
+    # One will be our test victim, the other will be for validation.
+    test_data = json.loads(json.dumps(raw_data))
+    original_data = json.loads(json.dumps(raw_data))
+    assert test_data == original_data
 
-expanded = JsonExpandOMatic(path=data_path, logger=logger).expand(
-    test_data, root_element='root', preserve=True)
-assert test_data == original_data
-# expand() returns a new representation of `data`
-assert expanded == {'root': {'$ref': './root.json'}}
+    expanded = JsonExpandOMatic(path=data_path).expand(
+        test_data, root_element='root', preserve=True)
+    assert test_data == original_data
+    # expand() returns a new representation of `data`
+    assert expanded == {'root': {'$ref': './root.json'}}
 
-expanded = JsonExpandOMatic(path=data_path, logger=logger).expand(
-    test_data, root_element='root', preserve=False)
-assert test_data != original_data
-# expand() returns a new representation of `data`
-assert expanded == {'root': {'$ref': './root.json'}}
+    expanded = JsonExpandOMatic(path=data_path).expand(
+        test_data, root_element='root', preserve=False)
+    assert test_data != original_data
+    # expand() returns a new representation of `data`
+    assert expanded == {'root': {'$ref': './root.json'}}
 
-# We can use jsonref to load this new representation.
-# Note that loading in this way exposes the wrapping element `root`.
-loaded = jsonref.loads(json.dumps(expanded), base_uri=f'file://{os.getcwd()}/{data_path}/')
-assert loaded == {'root': original_data}
-assert loaded['root'] == original_data
+    # We can use jsonref to load this new representation.
+    # Note that loading in this way exposes the wrapping element `root`.
+    # `data_path` must be a fully qualified path.
+    loaded = jsonref.loads(json.dumps(expanded), base_uri=f'file://{data_path}/')
+    assert loaded == {'root': original_data}
+    assert loaded['root'] == original_data
 
-# A raw load of the wrapping document has references to the sub-elements.
-# This assersion assumes that the original data's elements are all dicts.
-with open(f'{data_path}/root.json') as f:
-  assert json.load(f) == {k: {"$ref": f"root/{k}.json"} for k, v in original_data.items()}
+    # A raw load of the wrapping document has references to the sub-elements.
+    # This assersion assumes that the original data's elements are all dicts.
+    with open(f'{data_path}/root.json') as f:
+      assert json.load(f) == {k: {"$ref": f"root/{k}.json"} for k, v in original_data.items()}
 
-# We can use JsonExpandOMatic() to load the expanded data from the filesystem.
-# Note that this returns the original data exactly, the `root` wrapper is removed.
-contracted = JsonExpandOMatic(path=data_path, logger=logger).contract(root_element='root')
-assert contracted == original_data
+    # We can use JsonExpandOMatic() to load the expanded data from the filesystem.
+    # Note that this returns the original data exactly, the `root` wrapper is removed.
+    contracted = JsonExpandOMatic(path=data_path).contract(root_element='root')
+    assert contracted == original_data
 
-# Or we can use jsonref.load() to do the same.
-with open(f'{data_path}/root.json') as f:
-  assert jsonref.load(f, base_uri=f'file://{os.getcwd()}/{data_path}/') == original_data
+    # Or we can use jsonref.load() to do the same.
+    with open(f'{data_path}/root.json') as f:
+      assert jsonref.load(f, base_uri=f'file://{data_path}/') == original_data
+
+
+if __name__ == '__main__':
+  unittest.main()
