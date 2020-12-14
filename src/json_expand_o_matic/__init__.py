@@ -82,10 +82,13 @@ class JsonExpandOMatic:
     if not os.path.exists(path):
       os.mkdir(path)
 
+    # FIXME: Do this with a regex
+    filename_key = str(key).replace(':','_').replace('/','_').replace('\\','_')
+
     if isinstance(data[key], list):
       self.logger.debug(' ' * indent + '>> IS A LIST <<')
       for k, v in enumerate(data[key]):
-        self._expand(path=os.path.join(path, str(key)),
+        self._expand(path=os.path.join(path, str(filename_key)),
                      key=k, data=data[key], ref=f"{ref}/{key}",
                      indent=indent + 2)
 
@@ -96,14 +99,14 @@ class JsonExpandOMatic:
       for k in keys:
         # v = data[key][k]
         self.logger.debug(' ' * indent + k)
-        self._expand(path=os.path.join(path, str(key)),
+        self._expand(path=os.path.join(path, str(filename_key)),
                      key=k, data=data[key], ref=key,
                      indent=indent + 2)
 
-      with open(f"{path}/{key}.json", 'w') as f:
+      with open(f"{path}/{filename_key}.json", 'w') as f:
         json.dump(data[key], f, indent=4, sort_keys=True)
 
-      data[key] = {'$ref': f"{ref}/{key}.json"}
+      data[key] = {'$ref': f"{ref}/{filename_key}.json"}
 
     try:
       os.rmdir(path)
