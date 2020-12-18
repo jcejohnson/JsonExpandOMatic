@@ -31,7 +31,6 @@
 '''
 
 import json
-import jsonref
 import logging
 import os
 
@@ -61,10 +60,9 @@ class JsonExpandOMatic:
         - {self.path}/{root_element}.json
         - {self.path}/{root_element}/...
     '''
-    input_file = os.path.join(self.path, f"{root_element}.json")
-    self.logger.debug(f"Loading {root_element} from {input_file}")
-    with open(input_file) as f:
-      return jsonref.load(f, base_uri=f'file://{self.path}/')
+    return self._contract(
+        path=[self.path],
+        data=self._slurp(self.path, f"{root_element}.json"))
 
   def _expand(self, *, path, key, data, ref, indent=0):
     self.logger.debug(' ' * indent + f"path [{path}] key [{key}] ref [{ref}]")
@@ -83,7 +81,7 @@ class JsonExpandOMatic:
       os.mkdir(path)
 
     # FIXME: Do this with a regex
-    filename_key = str(key).replace(':','_').replace('/','_').replace('\\','_')
+    filename_key = str(key).replace(':', '_').replace('/', '_').replace('\\', '_')
 
     if isinstance(data[key], list):
       self.logger.debug(' ' * indent + '>> IS A LIST <<')
@@ -114,3 +112,26 @@ class JsonExpandOMatic:
       pass
 
     return data
+
+  def _contract(self, *, path, data):
+
+    if isinstance(data, list):
+      for k, v in enumerate(data):
+        data[k] = self._contract(path=path, data=v)
+
+    elif isinstance(data, dict):
+
+      for k, v in data.items():
+        if k != '$ref':
+          data[k] = self._contract(path=path, data=v)
+          continue
+
+        return self._contract(
+            path=path + [os.path.dirname(v)],
+            data=self._slurp(*path, v))
+
+    return data
+
+  def _slurp(self, *args):
+    with open(os.path.join(*args)) as f:
+      return json.load(f)

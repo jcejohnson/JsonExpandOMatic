@@ -2,8 +2,6 @@ import unittest
 
 import json
 import jsonref
-import os
-import shutil
 import shutil
 import tempfile
 
