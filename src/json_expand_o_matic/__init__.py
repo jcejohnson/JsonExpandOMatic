@@ -31,7 +31,6 @@
 '''
 
 import json
-import jsonref
 import logging
 import os
 
@@ -62,9 +61,7 @@ class JsonExpandOMatic:
         - {self.path}/{root_element}/...
     '''
     input_file = os.path.join(self.path, f"{root_element}.json")
-    self.logger.debug(f"Loading {root_element} from {input_file}")
-    with open(input_file) as f:
-      return jsonref.load(f, base_uri=f'file://{self.path}/')
+    return self._c1(path=self.path, filename=input_file)
 
   def _expand(self, *, path, key, data, ref, indent=0):
     self.logger.debug(' ' * indent + f"path [{path}] key [{key}] ref [{ref}]")
@@ -83,7 +80,7 @@ class JsonExpandOMatic:
       os.mkdir(path)
 
     # FIXME: Do this with a regex
-    filename_key = str(key).replace(':','_').replace('/','_').replace('\\','_')
+    filename_key = str(key).replace(':', '_').replace('/', '_').replace('\\', '_')
 
     if isinstance(data[key], list):
       self.logger.debug(' ' * indent + '>> IS A LIST <<')
@@ -114,3 +111,41 @@ class JsonExpandOMatic:
       pass
 
     return data
+
+  def _c1(self, *, path, filename):
+
+    with open(os.path.join(path, filename)) as f:
+      data = json.load(f)
+
+    path = os.path.join(path, os.path.dirname(filename))
+
+    return self._c2(path=path, data=data)
+
+  def _c2(self, *, path, data):
+
+    if not isinstance(data, dict) and not isinstance(data, list):
+      return data
+
+    if isinstance(data, list):
+      for k, v in enumerate(data):
+        data[k] = self._c2(path=path, data=v)
+
+    elif isinstance(data, dict):
+
+      for k, v in data.items():
+
+        if k == '$ref':
+          return self._c1(path=path, filename=v)
+
+        data[k] = self._c2(path=path, data=v)
+
+    return data
+
+
+'''
+{
+    "actors": {
+        "$ref": "root/actors.json"
+    }
+}
+'''
