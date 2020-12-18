@@ -52,5 +52,12 @@ setup(
     package_dir={'': 'src'},
     packages=find_packages(where='src'),  # Required
 
-    install_requires=(here / 'requirements.txt').read_text(encoding='utf-8').split('\n')
+    install_requires=(here / 'requirements.txt').read_text(encoding='utf-8').split('\n'),
+
+    entry_points={  # Optional
+        'console_scripts': [
+            'expand=json_expand_o_matic.cli:expand',
+            'contract=json_expand_o_matic.cli:contract',
+        ],
+    },
 )
