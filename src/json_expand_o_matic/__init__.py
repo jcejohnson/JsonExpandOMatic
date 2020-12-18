@@ -60,8 +60,9 @@ class JsonExpandOMatic:
         - {self.path}/{root_element}.json
         - {self.path}/{root_element}/...
     '''
-    input_file = os.path.join(self.path, f"{root_element}.json")
-    return self._c1(path=self.path, filename=input_file)
+    return self._contract(
+        path=[self.path],
+        data=self._slurp(self.path, f"{root_element}.json"))
 
   def _expand(self, *, path, key, data, ref, indent=0):
     self.logger.debug(' ' * indent + f"path [{path}] key [{key}] ref [{ref}]")
@@ -112,40 +113,25 @@ class JsonExpandOMatic:
 
     return data
 
-  def _c1(self, *, path, filename):
-
-    with open(os.path.join(path, filename)) as f:
-      data = json.load(f)
-
-    path = os.path.join(path, os.path.dirname(filename))
-
-    return self._c2(path=path, data=data)
-
-  def _c2(self, *, path, data):
-
-    if not isinstance(data, dict) and not isinstance(data, list):
-      return data
+  def _contract(self, *, path, data):
 
     if isinstance(data, list):
       for k, v in enumerate(data):
-        data[k] = self._c2(path=path, data=v)
+        data[k] = self._contract(path=path, data=v)
 
     elif isinstance(data, dict):
 
       for k, v in data.items():
+        if k != '$ref':
+          data[k] = self._contract(path=path, data=v)
+          continue
 
-        if k == '$ref':
-          return self._c1(path=path, filename=v)
-
-        data[k] = self._c2(path=path, data=v)
+        return self._contract(
+            path=path + [os.path.dirname(v)],
+            data=self._slurp(*path, v))
 
     return data
 
-
-'''
-{
-    "actors": {
-        "$ref": "root/actors.json"
-    }
-}
-'''
+  def _slurp(self, *args):
+    with open(os.path.join(*args)) as f:
+      return json.load(f)
