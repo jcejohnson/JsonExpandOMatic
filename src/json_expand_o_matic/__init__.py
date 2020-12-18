@@ -33,7 +33,7 @@
 import json
 import logging
 import os
-
+from urllib.parse import urlparse
 
 class JsonExpandOMatic:
 
@@ -122,15 +122,21 @@ class JsonExpandOMatic:
     elif isinstance(data, dict):
 
       for k, v in data.items():
-        if k != '$ref':
-          data[k] = self._contract(path=path, data=v)
-          continue
-
-        return self._contract(
-            path=path + [os.path.dirname(v)],
-            data=self._slurp(*path, v))
+        if self._something_to_follow(k,v):
+          return self._contract(
+              path=path + [os.path.dirname(v)],
+              data=self._slurp(*path, v))
+        data[k] = self._contract(path=path, data=v)
 
     return data
+
+  def _something_to_follow(self, k, v):
+
+    if k != '$ref':
+      return False
+
+    url_details = urlparse(v)
+    return not (url_details.scheme or url_details.fragment)
 
   def _slurp(self, *args):
     with open(os.path.join(*args)) as f:
