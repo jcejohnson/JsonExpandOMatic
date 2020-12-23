@@ -38,14 +38,16 @@ from urllib.parse import urlparse
 import concurrent.futures
 import threading
 import time
-from queue import Queue
-
+from queue import Queue, Empty
 
 class JsonExpandOMatic:
 
   def __init__(self, *, path, logger=logging.getLogger(__name__)):
     self.path = os.path.abspath(path)
     self.logger = logger
+    self.progress_level = 0
+    self.populate_delay = 10.0
+    self.drain_wait = 10.0
 
   def expand(self, data, root_element='root', preserve=True):
     '''Expand a dict into a collection of subdirectories and json files.
@@ -71,32 +73,33 @@ class JsonExpandOMatic:
     self.event = threading.Event()
 
     def _delegate(*args, **kwargs):
-        self._consumer(*args, **kwargs)
+        self._dequeue_contract_recursion(*args, **kwargs)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
       workers = executor._max_workers - 1
-      print(f"executor._max_workers = {executor._max_workers}")
+      self.logger.debug(f"executor._max_workers = {executor._max_workers}")
       while workers:
           executor.submit(_delegate, workers)
           workers -= 1
 
-      print("Ready to work")
+      self.logger.info("Main: Ready to work")
 
       r = self._contract(
           path=[self.path],
           data=self._slurp(self.path, f"{root_element}.json"))
 
-      print("Main: Waiting for queue to drain.")
+      self.logger.info("Main: Waiting for queue to populate.")
+      time.sleep(self.populate_delay)
 
+      self.logger.info(f"Main: Waiting for queue to drain. (size={self.queue.qsize()})")
       while not self.queue.empty():
-        print(f"Main: size={self.queue.qsize()}")
-        time.sleep(10.0)
+        self.logger.info(f"Main: Queue is processing. (size={self.queue.qsize()})")
+        time.sleep(self.drain_wait)
 
-      print(f"Main: size={self.queue.qsize()}")
-      print("Main: about to set event.")
+      self.logger.info(f"Main: Queue is empty. (size={self.queue.qsize()})")
       self.event.set()
 
-      print("")
+      self.logger.info("Main: Done")
 
       return r
 
@@ -151,41 +154,57 @@ class JsonExpandOMatic:
 
   def _contract(self, *, path, data, depth=0):
 
+    if depth < self.progress_level:
+      self.logger.info(f"{'  '*depth}>>>{path}")
+    elif depth:
+      self.logger.debug(f"{'  '*depth}>>>{path}")
+
     if isinstance(data, list):
       for k, v in enumerate(data):
-        self._process(recursion={'path':path, 'data':v}, target={'key':k,'data':v}, depth = depth+1)
+        self._queue_contract_recursion(depth=depth+1,
+          recursion={'path':path, 'data':v}, target={'data':data, 'key':k})
+        # data[k] = self._contract(depth=depth+1, path=path, data=v)
 
     elif isinstance(data, dict):
 
       for k, v in data.items():
         if self._something_to_follow(k,v):
-          data = self._contract( path=path + [os.path.dirname(v)], data=self._slurp(*path, v), depth = depth+1)
+          data = self._contract(depth=depth+1,
+                                path=path + [os.path.dirname(v)],
+                                data=self._slurp(*path, v))
           break
-        self._process(recursion={'path':path, 'data':v}, target={'key':k,'data':data}, depth = depth+1)
+        else:
+          self._queue_contract_recursion(depth=depth+1,
+            recursion={'path':path, 'data':v}, target={'data':data, 'key':k})
+          # data[k] = self._contract(depth=depth+1, path=path, data=v)
 
-    # if depth < 3:
-    #   print(f"{path} done at depth {depth} (size={self.queue.qsize()})") # , end='\r')
+    if depth < self.progress_level:
+      self.logger.info(f"{'  '*depth}<<<{path}")
+    elif depth:
+      self.logger.debug(f"{'  '*depth}<<<{path}")
 
     return data
 
-  def _process(self, *, recursion, target, depth):
-    # print(f"Submit request {recursion['path']} : {target['key']} (size={self.queue.qsize()})", end='\r')
-    # self.queue.put((recursion, target, depth))
-    target['data'][target['key']] = self._contract(path=recursion['path'], data=recursion['data'], depth=depth)
-
-  def _consumer(self, id):
-    # print(f"Started consumer {id}", end='\r')
+  def _dequeue_contract_recursion(self, cid):
+    self.logger.debug(f"Started consumer {cid}")
     while not self.event.is_set():
       try:
-        recursion, target, depth = self.queue.get(block=True, timeout=1)
-        # print(f"Consumer {id} processing message: {recursion['path']} : {target['key']} "
-              # f"(size={self.queue.qsize()}) (depth={depth})", end='\r')
-        target['data'][target['key']] = self._contract(path=recursion['path'], data=recursion['data'], depth=depth)
-      except Exception as e:
-          pass
+        depth, recursion, target = self.queue.get(block=True, timeout=1)
+        key = target['key']
+        target['data'][key] = self._contract(depth=depth, path=recursion['path'], data=recursion['data'])
+      except Empty as e:
+        self.logger.debug(f"{cid} -- {e}")
+        pass
+    self.logger.debug(f"Stopping consumer {cid}")
 
-    # print(f"Consumer {id} received event. Exiting.", end='\r')
+  def _queue_contract_recursion(self, *, depth, recursion, target):
+    # key = target['key']
+    # target['data'][key] = self._contract(depth=depth, path=recursion['path'], data=recursion['data'])
+    self.queue.put((depth, recursion, target))
 
+  def _slurp(self, *args):
+    with open(os.path.join(*args)) as f:
+      return json.load(f)
 
   def _something_to_follow(self, k, v):
 
@@ -194,7 +213,3 @@ class JsonExpandOMatic:
 
     url_details = urlparse(v)
     return not (url_details.scheme or url_details.fragment)
-
-  def _slurp(self, *args):
-    with open(os.path.join(*args)) as f:
-      return json.load(f)
