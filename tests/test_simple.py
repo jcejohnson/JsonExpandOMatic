@@ -75,16 +75,12 @@ class TestSimple(unittest.TestCase):
         original_data = json.loads(json.dumps(raw_data))
         assert test_data == original_data
 
-        expanded = JsonExpandOMatic(path=data_path).expand(
-            test_data, root_element="root", preserve=True
-        )
+        expanded = JsonExpandOMatic(path=data_path).expand(test_data, root_element="root", preserve=True)
         assert test_data == original_data
         # expand() returns a new representation of `data`
         assert expanded == {"root": {"$ref": "./root.json"}}
 
-        expanded = JsonExpandOMatic(path=data_path).expand(
-            test_data, root_element="root", preserve=False
-        )
+        expanded = JsonExpandOMatic(path=data_path).expand(test_data, root_element="root", preserve=False)
         assert test_data != original_data
         # expand() returns a new representation of `data`
         assert expanded == {"root": {"$ref": "./root.json"}}
@@ -99,9 +95,7 @@ class TestSimple(unittest.TestCase):
         # A raw load of the wrapping document has references to the sub-elements.
         # This assersion assumes that the original data's elements are all dicts.
         with open(f"{data_path}/root.json") as f:
-            assert json.load(f) == {
-                k: {"$ref": f"root/{k}.json"} for k, v in original_data.items()
-            }
+            assert json.load(f) == {k: {"$ref": f"root/{k}.json"} for k, v in original_data.items()}
 
         # We can use JsonExpandOMatic() to load the expanded data from the filesystem.
         # Note that this returns the original data exactly, the `root` wrapper is removed.
