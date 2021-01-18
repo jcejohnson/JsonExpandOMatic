@@ -1,3 +1,4 @@
+# JSON Expand-O-Matic
 
 Expand a dict into a collection of subdirectories and json files or contract (un-expand) the output of expand() into a dict.
 
@@ -28,3 +29,15 @@ Contract -- decrease in size, number, or range.
       data = jsonref.load(f, base_uri=f'file://{os.path.abspath(data_path)}/')
 
 
+## Testing
+
+Install & use tox:
+  python -m venv venv
+  venv/bin/pip install tox
+  venv/bin/tox
+
+Update requirements.txt and dev-requirements.txt:
+  venv/bin/tox deps
+
+Reformat the code to make it pretty:
+  venv/bin/tox fmt
