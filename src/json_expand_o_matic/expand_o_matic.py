@@ -107,7 +107,7 @@ class JsonExpandOMatic:
         dict
             data
         """
-        print(" " * indent + f"path [{path}] key [{key}] ref [{ref}] traversal [{traversal}]")
+        self.logger.debug(" " * indent + f"path [{path}] key [{key}] ref [{ref}] traversal [{traversal}]")
 
         if [p for p in self.leaf_nodes if p.match(traversal)]:
             return data
@@ -117,7 +117,7 @@ class JsonExpandOMatic:
         if not isinstance(data[key], dict) and not isinstance(data[key], list):
             return data
         if not data[key]:
-            print(" " * indent + f"data[{key}] is falsy")
+            self.logger.debug(" " * indent + f"data[{key}] is falsy")
             return data
 
         if not os.path.exists(path):
@@ -127,7 +127,7 @@ class JsonExpandOMatic:
         filename_key = str(key).replace(":", "_").replace("/", "_").replace("\\", "_")
 
         if isinstance(data[key], list):
-            print(" " * indent + ">> IS A LIST <<")
+            self.logger.debug(" " * indent + ">> IS A LIST <<")
             for k, v in enumerate(data[key]):
                 self._expand(
                     path=os.path.join(path, str(filename_key)),
@@ -139,12 +139,12 @@ class JsonExpandOMatic:
                 )
 
         elif isinstance(data[key], dict):
-            print(" " * indent + ">> IS A DICT <<")
+            self.logger.debug(" " * indent + ">> IS A DICT <<")
 
             keys = sorted(data[key].keys())
             for k in keys:
                 # v = data[key][k]
-                print(" " * indent + k)
+                self.logger.debug(" " * indent + k)
                 self._expand(
                     path=os.path.join(path, str(filename_key)),
                     key=k,
@@ -155,7 +155,7 @@ class JsonExpandOMatic:
                 )
 
             with open(f"{path}/{filename_key}.json", "w") as f:
-                print(f"Writing [{path}/{filename_key}.json] for [{traversal}]")
+                self.logger.debug(f"Writing [{path}/{filename_key}.json] for [{traversal}]")
                 json.dump(data[key], f, indent=4, sort_keys=True)
 
             data[key] = {"$ref": f"{ref}/{filename_key}.json"}
