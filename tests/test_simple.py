@@ -57,7 +57,9 @@ raw_data = {
 }
 
 
-data_path = tempfile.mkdtemp()
+data_path = tempfile.mkdtemp()  # /tmp/tmp8d6hy1iq
+data_path_basename = data_path.split("/")[-1]
+data_path_dirname = "/".join(data_path.split("/")[0:-1])
 
 
 class TestSimple(unittest.TestCase):
@@ -78,17 +80,19 @@ class TestSimple(unittest.TestCase):
         expanded = JsonExpandOMatic(path=data_path).expand(test_data, root_element="root", preserve=True)
         assert test_data == original_data
         # expand() returns a new representation of `data`
-        assert expanded == {"root": {"$ref": "./root.json"}}
+        assert expanded == {"root": {"$ref": f"{data_path_basename}/root.json"}}
+        #                  {'root': {'$ref': 'tmp8d6hy1iq/root.json'}}
 
         expanded = JsonExpandOMatic(path=data_path).expand(test_data, root_element="root", preserve=False)
         assert test_data != original_data
         # expand() returns a new representation of `data`
-        assert expanded == {"root": {"$ref": "./root.json"}}
+        assert expanded == {"root": {"$ref": f"{data_path_basename}/root.json"}}
+        #                  {'root': {'$ref': 'tmp8d6hy1iq/root.json'}}
 
         # We can use jsonref to load this new representation.
         # Note that loading in this way exposes the wrapping element `root`.
         # `data_path` must be a fully qualified path.
-        loaded = jsonref.loads(json.dumps(expanded), base_uri=f"file://{data_path}/")
+        loaded = jsonref.loads(json.dumps(expanded), base_uri=f"file://{data_path_dirname}/")
         assert loaded == {"root": original_data}
         assert loaded["root"] == original_data
 

@@ -13,6 +13,7 @@ def expand():
     JsonExpandOMatic(path=sys.argv[1]).expand(
         json.load(open(sys.argv[2])),
         preserve=False,
+        # leaf_nodes=[{"/root/actors/.*": ["/movies/.*"]}]
         leaf_nodes=sys.argv[3:] if len(sys.argv) > 3 else [],
     )
 
