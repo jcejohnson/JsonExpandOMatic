@@ -22,6 +22,8 @@ chardet==4.0.0
     # via requests
 click==7.1.2
     # via black
+colorama==0.4.4
+    # via pytest-resource-path
 coverage==5.3.1
     # via pytest-cov
 dataclasses==0.8
@@ -98,10 +100,13 @@ pyparsing==2.4.7
     # via packaging
 pytest-cov==2.11.0
     # via -r dev-requirements.in
+pytest-resource-path==1.2.1
+    # via -r dev-requirements.in
 pytest==6.2.1
     # via
     #   -r dev-requirements.in
     #   pytest-cov
+    #   pytest-resource-path
 pytz==2020.5
     # via babel
 regex==2020.11.13

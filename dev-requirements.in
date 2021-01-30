@@ -1,6 +1,7 @@
 tox
 pytest
 pytest-cov
+pytest-resource-path
 mypy
 flake8
 pep8-naming
