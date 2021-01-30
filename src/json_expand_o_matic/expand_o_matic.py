@@ -58,7 +58,7 @@ class JsonExpandOMatic:
 
         self._compile_regexs(leaf_nodes)
 
-        r = self._expand(path=self.path, data={root_element: data}, my_path_component=self.path.split("/")[-1])
+        r = self._expand(path=self.path, data={root_element: data}, my_path_component=os.path.basename(self.path))
 
         # Cleanup before leaving.
         self.leaf_nodes = None
@@ -186,12 +186,17 @@ class JsonExpandOMatic:
 
     def _pluck_leaf_node(self, *, path, data, indent, traversal):
 
-        for p in self.leaf_nodes:
-            if not p.match(traversal):
+        for c in self.leaf_nodes:
+            if not c.match(traversal):
                 continue
 
             with open(f"{path}.json", "w") as f:
                 json.dump(data, f, indent=4, sort_keys=True)
+
+            if c in self.other_things:
+                JsonExpandOMatic(path=os.path.dirname(path)).expand(
+                    data, preserve=False, leaf_nodes=self.other_things[c], root_element=os.path.basename(path)
+                )
 
             return data
 
