@@ -8,11 +8,19 @@ from . import JsonExpandOMatic
 #       It is simply here as a quick way to interact with the library.
 
 
-def expand():
+def main():
 
-    JsonExpandOMatic(path=sys.argv[1]).expand(
-        json.load(open(sys.argv[2])), preserve=False, leaf_nodes=sys.argv[3:] if len(sys.argv) > 3 else []
-    )
+    if sys.argv[1] == "expand":
+        expand(*sys.argv[2:])
+    elif sys.argv[1] == "contract":
+        contract(*sys.argv[2:])
+    else:
+        raise Exception(f"Unknown request [{sys.argv[1]}]")
+
+
+def expand(output_path, input_file, *leaf_nodes):
+
+    JsonExpandOMatic(path=output_path).expand(json.load(open(input_file)), preserve=False, leaf_nodes=leaf_nodes)
 
     # For instance, leaf_nodes can include elements that are dictionaries
     # rather than regex strings. Each key of the dict is the regex and each
@@ -22,16 +30,15 @@ def expand():
     #    leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}]
 
 
-def contract():
+def contract(input_path, root_element="root"):
 
-    root_element = sys.argv[2] if len(sys.argv) > 2 else "root"
     print(
         json.dumps(
             # You can also contract with jsonref (see the tests).
             # Our contract() method is here for convenience.
             # Due to its simple nature, it is also a bit more lightweight
             # than jsonref.
-            JsonExpandOMatic(path=sys.argv[1]).contract(root_element=root_element),
+            JsonExpandOMatic(path=input_path).contract(root_element=root_element),
             indent=4,
             sort_keys=True,
         )

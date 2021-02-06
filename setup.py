@@ -56,8 +56,7 @@ setup(
 
     entry_points={  # Optional
         'console_scripts': [
-            'expand=json_expand_o_matic.cli:expand',
-            'contract=json_expand_o_matic.cli:contract',
+            'JsonExpandOMatic=json_expand_o_matic.cli:main'
         ],
     },
 )

@@ -32,12 +32,17 @@ Contract -- decrease in size, number, or range.
 ## Testing
 
 Install & use tox:
-  python -m venv venv
-  venv/bin/pip install tox
-  venv/bin/tox
+  ./tox.sh
 
 Update requirements.txt and dev-requirements.txt:
-  venv/bin/tox deps
+  ./tox.sh deps
 
 Reformat the code to make it pretty:
-  venv/bin/tox fmt
+  ./tox.sh fmt
+
+Manually run the commands:
+  ./wrapper.sh
+  ./expand.sh output tests/testresources/actor-data.json
+  ./contract.sh output | jq -S . > output.json
+  ls -l output.json tests/testresources/actor-data.json
+  cmp output.json <(jq -S . tests/testresources/actor-data.json)
