@@ -20,7 +20,13 @@ def main():
 
 def expand(output_path, input_file, *leaf_nodes):
 
-    JsonExpandOMatic(path=output_path).expand(json.load(open(input_file)), preserve=False, leaf_nodes=leaf_nodes)
+    JsonExpandOMatic(path=output_path).expand(
+        json.load(open(input_file)),
+        preserve=False,
+        leaf_nodes=leaf_nodes
+        # leaf_nodes=["/root/actors/.*/movies/.*"]
+        # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]
+    )
 
     # For instance, leaf_nodes can include elements that are dictionaries
     # rather than regex strings. Each key of the dict is the regex and each

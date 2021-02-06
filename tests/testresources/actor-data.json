@@ -26,6 +26,28 @@
           "title": "Modern Times",
           "year": 1936
         }
+      },
+      "spouses": {
+        "lita_grey": {
+          "children": [],
+          "first_name": "Lita",
+          "last_name": "Grey"
+        },
+        "mildred_harris": {
+          "children": [],
+          "first_name": "Mildred",
+          "last_name": "Harris"
+        },
+        "oona_oneill": {
+          "children": [],
+          "first_name": "Oona",
+          "last_name": "O'Neill"
+        },
+        "paulette_goddard": {
+          "children": [],
+          "first_name": "Paulette",
+          "last_name": "Goddard"
+        }
       }
     },
     "dwayne_johnson": {
