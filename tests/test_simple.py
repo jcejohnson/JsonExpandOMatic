@@ -1,7 +1,7 @@
 import json
+import os
 
 import jsonref  # type: ignore
-import os
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
