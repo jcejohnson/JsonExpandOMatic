@@ -57,6 +57,7 @@ class TestSimple:
 
     def test_file_exixtence(self, tmpdir, test_data, original_data):
         expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root")
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         # This is the wrapper around the original data
         assert os.path.exists(f"{tmpdir}/root.json")

@@ -60,6 +60,12 @@ class LeafNode:
         if isinstance(data, LeafNode):
             return [data]
 
+        if isinstance(data, list):
+            result = []
+            for item in data:
+                result.extend(LeafNode.construct(item))
+            return result
+
         if not isinstance(data, str) and not isinstance(data, dict):
             raise Exception(f"Illegal type for leaf-node: {type(data)} : {data}")
 
@@ -96,21 +102,21 @@ class LeafNode:
         for c in r.commands:
             if c in [" ", ":"]:
                 pass
-            elif c is ">":
+            elif c == ">":
                 r.WHAT = LeafNode.What.DUMP
-            elif c is "<":
+            elif c == "<":
                 r.WHAT = LeafNode.What.INCLUDE
-            elif c is "B":
+            elif c == "B":
                 r.WHEN = LeafNode.When.BEFORE
-            elif c is "A":
+            elif c == "A":
                 r.WHEN = LeafNode.When.AFTER
-            elif c is "P":
+            elif c == "P":
                 r.PRECOMPILE = True
-            elif c is "p":
+            elif c == "p":
                 r.PRECOMPILE = False
-            elif c is "F":
+            elif c == "F":
                 r.FORMAT = True
-            elif c is "f":
+            elif c == "f":
                 r.FORMAT = False
 
         if r.PRECOMPILE:
