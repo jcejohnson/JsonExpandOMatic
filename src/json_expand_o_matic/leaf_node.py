@@ -35,9 +35,9 @@ class LeafNode:
     def __init__(self, *args, **kwargs):
         pass
 
-    def match(self, string):
+    def match(self, *, string, when=None):
         """Compare _string_ to our compiled regex."""
-        return self.compiled.match(string)
+        return when == self.WHEN and self.compiled.match(string)
 
     def format(self, **context):
         """Apply the context to our pattern and recompile."""

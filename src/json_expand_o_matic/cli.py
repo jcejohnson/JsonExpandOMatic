@@ -24,9 +24,10 @@ def expand(output_path, input_file, *leaf_nodes):
         json.load(open(input_file)),
         preserve=False,
         # leaf_nodes=leaf_nodes
+        # leaf_nodes=["/.*"]
         # leaf_nodes=["/root/actors/.*/movies/.*"]
-        leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]
-        # This isn't working yet
+        # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]
+        # # This may be working...
         # leaf_nodes=[
         #     {
         #         ">B:/root/actors/[^/]+$": [
@@ -38,7 +39,7 @@ def expand(output_path, input_file, *leaf_nodes):
         #             # "<A:/.*"
         #         ]
         #     }
-        # ]
+        # ],
     )
 
     # For instance, leaf_nodes can include elements that are dictionaries
