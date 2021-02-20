@@ -91,7 +91,7 @@ class LeafNode:
         r.commands = m.group(1) if m.group(1) else ""
         r.pattern = m.group(2) if m.group(2) else ""
 
-        if '#' in r.commands:
+        if "#" in r.commands:
             r.comment = True
             return [r]
 
