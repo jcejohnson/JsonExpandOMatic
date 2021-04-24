@@ -95,7 +95,7 @@ class Expander:
         try:
             with open(filename, "w") as f:
                 json.dump(self.data, f, indent=4, sort_keys=True)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             os.makedirs(directory)
             with open(filename, "w") as f:
                 json.dump(self.data, f, indent=4, sort_keys=True)
