@@ -11,7 +11,7 @@ from . import JsonExpandOMatic
 def main():
 
     if sys.argv[1] == "--help":
-        myself = sys.argv[0].split('/')[-1]
+        myself = sys.argv[0].split("/")[-1]
         print(f"{myself} expand <output-path> <input-file> [<leaf-nodes-spec> ...]")
         print(f"{myself} contract <input-path> [<root-element>]")
     elif sys.argv[1] == "--version":
