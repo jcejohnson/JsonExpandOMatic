@@ -28,6 +28,23 @@ Contract -- decrease in size, number, or range.
     with open(f'{data_path}/root.json') as f:
       data = jsonref.load(f, base_uri=f'file://{os.path.abspath(data_path)}/')
 
+## Quick Start
+
+Setup wrapper scripts:
+  ./wrapper.sh
+
+Install for development:
+  ./expand.sh --version
+
+Do a thing:
+  rm -rf output
+  ./expand.sh output tests/testresources/actor-data.json 2>&1 | tee log.txt
+  find output -type f | sort
+
+Do another thing:
+  rm -rf output
+  ./expand.sh output tests/testresources/actor-data.json '[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]' 2>&1 | tee log.txt
+  find output -type f | sort
 
 ## Testing
 

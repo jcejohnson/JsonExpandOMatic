@@ -10,7 +10,13 @@ from . import JsonExpandOMatic
 
 def main():
 
-    if sys.argv[1] == "expand":
+    if sys.argv[1] == "--help":
+        myself = sys.argv[0].split('/')[-1]
+        print(f"{myself} expand <output-path> <input-file> [<leaf-nodes-spec> ...]")
+        print(f"{myself} contract <input-path> [<root-element>]")
+    elif sys.argv[1] == "--version":
+        print("v0.1.0")
+    elif sys.argv[1] == "expand":
         expand(*sys.argv[2:])
     elif sys.argv[1] == "contract":
         contract(*sys.argv[2:])
