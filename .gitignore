@@ -23,6 +23,7 @@ venv
 python-blueprint/
 
 # These are all links to wrapper.sh. Do not commit them.
+bumpversion.sh
 contract.sh
 expand.sh
 tox.sh

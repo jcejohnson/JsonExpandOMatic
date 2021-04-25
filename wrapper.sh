@@ -16,16 +16,22 @@ fi
 
 [ -x venv/bin/JsonExpandOMatic ] || venv/bin/pip install -e .
 
-if [ ${self} = 'wrapper.sh' ] ; then
-  for thing in expand contract tox ; do ln -f ${self} ${thing}.sh ; done
-  exit 0
-fi
+case ${self} in
 
-if [ ${self} = 'tox.sh' ]
-then
-  [ -x venv/bin/tox ] || venv/bin/pip install tox
-  exec venv/bin/tox "$@"
-fi
+  bumpversion.sh)
+    exec venv/bin/bumpversion "$@"
+    ;;
+
+  tox.sh)
+    [ -x venv/bin/tox ] || venv/bin/pip install tox
+    exec venv/bin/tox "$@"
+    ;;
+
+  wrapper.sh)
+    for thing in expand contract tox bumpversion ; do ln -f ${self} ${thing}.sh ; done
+    exit 0
+    ;;
+esac
 
 if [[ "$1" =~ --* ]] ; then
   exec venv/bin/JsonExpandOMatic "$@"
