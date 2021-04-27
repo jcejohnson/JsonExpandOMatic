@@ -15,7 +15,7 @@ def main():
         print(f"{myself} expand <output-path> <input-file> [<leaf-nodes-spec> ...]")
         print(f"{myself} contract <input-path> [<root-element>]")
     elif sys.argv[1] == "--version":
-        print("v0.1.0")
+        print("v0.1.1")
     elif sys.argv[1] == "expand":
         expand(*sys.argv[2:])
     elif sys.argv[1] == "contract":
