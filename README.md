@@ -2,33 +2,27 @@
 
 Expand a dict into a collection of subdirectories and json files or contract (un-expand) the output of expand() into a dict.
 
+Expand -- become or make larger or more extensive.
+
+Contract -- decrease in size, number, or range.
+
 ## Overview
 
 Construct
 
+    data_path = ...
     expandomatic = JsonExpandOMatic(path=data_path, logger=logger)
 
-Expand -- become or make larger or more extensive.
+Expand -- Creates {data_path}/root.json and {data_path}/root/...
 
     data = { ... }
-
-    data_path = sys.argv[1] if len(sys.argv) > 1 else '.'
-
-Create {data_path}/root.json and {data_path}/root/...
-
     expandomatic.expand(data)
 
-Create {data_path}/foo.json and {data_path}/foo/...
-
-    expandomatic.expand(foo, root_element='foo')
-
-    Warning: expand() is destructive unless `preserve=True`
-
-Contract -- decrease in size, number, or range.
+Contract -- Returns dict representation of {data_path}/root.json and {data_path}/root/...
 
     data = expandomatic.contract()
 
-Or use jsonref
+Contract using jsonref
 
     import jsonref
     f = open(f'{data_path}/root.json')  # Yes, use a context.
@@ -36,11 +30,11 @@ Or use jsonref
 
 ## Quick Start
 
-Setup wrapper scripts:
+Setup wrapper scripts & venv:
 
     ./wrapper.sh
 
-Install for development:
+Validate setup:
 
     ./expand.sh --version
 
@@ -53,7 +47,8 @@ Do a thing:
 Do another thing:
 
     rm -rf output
-    ./expand.sh output tests/testresources/actor-data.json '[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]' 2>&1 | tee log.txt
+    ./expand.sh output tests/testresources/actor-data.json \
+        '[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]' 2>&1 | tee log.txt
     find output -type f | sort
 
 ## Testing
@@ -73,7 +68,15 @@ Reformat the code to make it pretty:
 Manually run the commands:
 
     ./wrapper.sh
-    ./expand.sh output tests/testresources/actor-data.json
-    ./contract.sh output | jq -S . > output.json
+    ./venv/bin/JsonExpandOMatic expand output tests/testresources/actor-data.json
+    ./venv/bin/JsonExpandOMatic contract output | jq -S . > output.json
     ls -l output.json tests/testresources/actor-data.json
     cmp output.json <(jq -S . tests/testresources/actor-data.json)
+
+## Beyond Basics
+
+In the simplest case we will create a directory tree full of json files. A file is created for each dict or list in the source dict. These are the things covered by [test_simple.py](tests/test_simple.py).
+
+In the real world, we want to have more control over when we create the json files. Given our [test data](tests/testresources/actor-data.json), we may want to create a json file per actor, per movie or per some other criteria. We do this by specifying [LeafNodes](src/json_expand_o_matic/leaf_node.py) (as in leaves on a tree that terminate branches) and these are the things covered by [test_leaves.py](tests/test_leaves.py). There are also commented-out examples of leaf nodes in the [cli](src/json_expand_o_matic/cli.py).
+
+To be continued...

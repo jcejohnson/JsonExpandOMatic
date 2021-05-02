@@ -4,7 +4,7 @@ import re
 
 class LeafNode:
     """Identifies a leaf node during json traversal and what to
-    do if that leaf node is encoutered.
+    do if that leaf node is encountered.
     """
 
     # # -- a comment
