@@ -1,8 +1,5 @@
 
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import wait as wait_for
-from time import sleep
-
+import concurrent.futures
 import json
 import os
 
@@ -22,7 +19,7 @@ class Expander:
         self.leaf_nodes = leaf_nodes
 
         self.main_thread = (thread_pool == None)
-        self.thread_pool = thread_pool if thread_pool else ThreadPoolExecutor()
+        self.thread_pool = thread_pool if thread_pool else concurrent.futures.ThreadPoolExecutor()
 
     def execute(self):
         """Expand self.data into one or more json files."""
@@ -62,15 +59,25 @@ class Expander:
         if self._is_leaf_node(LeafNode.When.BEFORE):
             return self.data
 
-        futures = {}
+        # Get a list of (key, launcher) tuples
+        launchers = []
         for key in self._data_iter():
-            self._recursively_expand(key=key, futures=futures)
+            self._recursively_expand(key=key, launchers=launchers)
 
-        completed, incomplete = wait_for(futures.values())
-        if incomplete:
-            raise Exception(f"Some tasks did not complete: {incomplete}")
-        for key in futures:
-            self.data[key] = futures[key].result()
+        # Like commit 8d7a0df, this is also naive.
+        # In both cases we are adding work to the pool before recursing.
+        # For a deeply nested document we use up all of the threads before
+        # we hit a leaft node & do any work.
+        # What I _probably_ want to do is only put _dump() invocations into
+        # the pool since we're probably more IO bound than CPU bound.
+        # Alternatively, let the caller specify which nesting level of the
+        # document should use the pool. A human will know the nature of the
+        # data far better than I can guess at it.
+        results = self.thread_pool.map(lambda item: [item[0], item[1]()], launchers)
+
+        # Extract the (key, value) results
+        for result in results:
+            self.data[result[0]] = result[1]
 
         if self._is_leaf_node(LeafNode.When.AFTER):
             return self.data
@@ -144,7 +151,7 @@ class Expander:
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
 
-    def _recursively_expand(self, *, key, futures):
+    def _recursively_expand(self, *, key, launchers):
 
         if not (isinstance(self.data[key], dict) or isinstance(self.data[key], list)):
             return None
@@ -160,10 +167,6 @@ class Expander:
                 thread_pool=self.thread_pool
             )._execute(indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}")
 
-        # This is naive.
-        # A deeply nested json doc will use all threads before any get a chance
-        # to start processing. We need to put the launches on a queue have the
-        # pool fed from there.
-        futures[key] = self.thread_pool.submit(launch_expansion)
+        launchers.append([key, launch_expansion])
 
         # self.data[key] = {"$ref": f"{self.my_path_component}/{path_component}.json"}
