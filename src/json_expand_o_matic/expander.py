@@ -1,3 +1,8 @@
+
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as wait_for
+from time import sleep
+
 import json
 import os
 
@@ -7,7 +12,7 @@ from .leaf_node import LeafNode
 class Expander:
     """Expand a dict or list into one or more json files."""
 
-    def __init__(self, *, logger, path, data, leaf_nodes):
+    def __init__(self, *, logger, path, data, leaf_nodes, thread_pool=None):
 
         assert isinstance(data, dict) or isinstance(data, list)
 
@@ -15,6 +20,9 @@ class Expander:
         self.path = path
         self.data = data
         self.leaf_nodes = leaf_nodes
+
+        self.main_thread = (thread_pool == None)
+        self.thread_pool = thread_pool if thread_pool else ThreadPoolExecutor()
 
     def execute(self):
         """Expand self.data into one or more json files."""
@@ -54,8 +62,15 @@ class Expander:
         if self._is_leaf_node(LeafNode.When.BEFORE):
             return self.data
 
+        futures = {}
         for key in self._data_iter():
-            self._recursively_expand(key=key)
+            self._recursively_expand(key=key, futures=futures)
+
+        completed, incomplete = wait_for(futures.values())
+        if incomplete:
+            raise Exception(f"Some tasks did not complete: {incomplete}")
+        for key in futures:
+            self.data[key] = futures[key].result()
 
         if self._is_leaf_node(LeafNode.When.AFTER):
             return self.data
@@ -92,13 +107,9 @@ class Expander:
 
         directory = os.path.dirname(self.path)
         filename = f"{self.path}.json"
-        try:
-            with open(filename, "w") as f:
-                json.dump(self.data, f, indent=4, sort_keys=True)
-        except FileNotFoundError:
-            os.makedirs(directory)
-            with open(filename, "w") as f:
-                json.dump(self.data, f, indent=4, sort_keys=True)
+        os.makedirs(directory, exist_ok=True)
+        with open(filename, "w") as f:
+            json.dump(self.data, f, indent=4, sort_keys=True)
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
@@ -133,18 +144,26 @@ class Expander:
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
 
-    def _recursively_expand(self, *, key):
+    def _recursively_expand(self, *, key, futures):
 
         if not (isinstance(self.data[key], dict) or isinstance(self.data[key], list)):
-            return
+            return None
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        self.data[key] = Expander(
-            logger=self.logger,
-            path=os.path.join(self.path, path_component),
-            data=self.data[key],
-            leaf_nodes=self.leaf_nodes,
-        )._execute(indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}")
+        def launch_expansion():
+            return Expander(
+                logger=self.logger,
+                path=os.path.join(self.path, path_component),
+                data=self.data[key],
+                leaf_nodes=self.leaf_nodes,
+                thread_pool=self.thread_pool
+            )._execute(indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}")
+
+        # This is naive.
+        # A deeply nested json doc will use all threads before any get a chance
+        # to start processing. We need to put the launches on a queue have the
+        # pool fed from there.
+        futures[key] = self.thread_pool.submit(launch_expansion)
 
         # self.data[key] = {"$ref": f"{self.my_path_component}/{path_component}.json"}
