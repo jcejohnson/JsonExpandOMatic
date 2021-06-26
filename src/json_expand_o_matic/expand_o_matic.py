@@ -19,7 +19,7 @@ class JsonExpandOMatic:
         self.path = os.path.abspath(path)
         self.logger = logger
 
-    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[]):
+    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], **expander_options):
         """Expand a dict into a collection of subdirectories and json files.
 
         Creates:
@@ -51,11 +51,17 @@ class JsonExpandOMatic:
 
         from .expander import Expander
 
-        r = Expander(
-            logger=self.logger, path=self.path, data={root_element: data}, leaf_nodes=LeafNode.construct(leaf_nodes)
-        ).execute()
+        expander = Expander(
+            logger=self.logger,
+            path=self.path,
+            data={root_element: data},
+            leaf_nodes=LeafNode.construct(leaf_nodes),
+            **expander_options,
+        )
+        result = expander.execute()
+        self.hashcodes = expander.hashcodes
 
-        return r
+        return result
 
     def contract(self, root_element="root"):
         """Contract (un-expand) the results of `expand()` into a dict.

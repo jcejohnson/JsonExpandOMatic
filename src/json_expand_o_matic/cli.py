@@ -33,11 +33,14 @@ def expand(output_path, input_file, *leaf_nodes_input):
         except Exception:
             leaf_nodes.append(node)
 
+    from .expander import Expander
+
     JsonExpandOMatic(path=output_path).expand(
         data=json.load(open(input_file)),
         root_element="root",
         preserve=False,
-        leaf_nodes=leaf_nodes
+        leaf_nodes=leaf_nodes,
+        hash_mode=Expander.HASH_MD5
         # leaf_nodes=["/.*"]
         # leaf_nodes=["/root/actors/.*/movies/.*"]
         # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]
