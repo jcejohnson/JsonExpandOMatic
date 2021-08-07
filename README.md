@@ -31,8 +31,8 @@ Contract -- decrease in size, number, or range.
 Or use jsonref
 
     import jsonref
-    f = open(f'{data_path}/root.json')  # Yes, use a context.
-    data = jsonref.load(f, base_uri=f'file://{os.path.abspath(data_path)}/')
+    with open(f'{data_path}/root.json') as f:
+        data = jsonref.load(f, base_uri=f'file://{os.path.abspath(data_path)}/')
 
 ## Quick Start
 
