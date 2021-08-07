@@ -137,7 +137,7 @@ class Expander:
         """Strip self.path from the hashcodes' files in case we want to make $refs from them.
         Also removes any entries having less than two files.
         """
-        l = len(self.path) + 1
+        l = len(self.path) + 1  # noqa: E741
         self.hashcodes = {k: [f[l:] for f in v] for k, v in self.hashcodes.items() if len(v) > 1}
 
     def _hash_md5(self, dumps):
