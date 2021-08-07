@@ -8,3 +8,5 @@ colorama==0.4.4
     # via -r requirements.in
 exitstatus==2.1.0
     # via -r requirements.in
+jsonref==0.2
+    # via -r requirements.in

@@ -27,6 +27,7 @@
       with open(f'{data_path}/root.json') as f:
         data = jsonref.load(f, base_uri=f'file://{os.path.abspath(data_path)}/')
 
+    See also: .jsonrefkeeper
 
 """
 
