@@ -23,7 +23,7 @@ jobs:
     - name: setup
       run: |
         ./wrapper.sh
-        ./extract --version
+        ./expand.sh --version
 
     - name: test
       run: |

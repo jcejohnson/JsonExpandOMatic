@@ -64,11 +64,11 @@ Install & use tox:
 
 Update requirements.txt and dev-requirements.txt:
 
-    ./tox.sh deps
+    ./tox.sh -e deps
 
 Reformat the code to make it pretty:
 
-    ./tox.sh fmt
+    ./tox.sh -e fmt
 
 Manually run the commands:
 
