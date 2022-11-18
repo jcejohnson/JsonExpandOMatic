@@ -8,6 +8,8 @@
 .cache
 .coverage
 .eggs/
+.mypy_cache/
+.pytest_cache/
 .tox
 __pycache__/
 build/
@@ -19,3 +21,11 @@ venv
 # https://github.com/johnthagen/python-blueprint
 # This is what I used to stamp out the original project structure.
 python-blueprint/
+
+# These are all links to wrapper.sh. Do not commit them.
+contract.sh
+expand.sh
+tox.sh
+
+# Our de-facto manual test output.
+output*
