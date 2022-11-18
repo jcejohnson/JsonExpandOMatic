@@ -48,11 +48,14 @@ jobs:
         run: |
           ./tox.sh
 
-      - name: publish
+      # Build a binary wheel and a source tarball
+      - name: build
         run: |
-          python3 setup.py sdist bdist_wheel
-          python3 -m twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          TWINE_REPOSITORY: testpypi
+          python3 -m pip install build --user
+          python3 -m build --sdist --wheel --outdir dist/ .
+
+      - name: publish
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
