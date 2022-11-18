@@ -10,7 +10,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 setup(
     name='json_expand_o_matic',
 
-    version='0.1.1',
+    version='0.1.2',
 
     description='Expand a dict into a collection of subdirectories and json files or '
                 'contract (un-expand) the output of expand() into a dict.',
