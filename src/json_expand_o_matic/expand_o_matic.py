@@ -4,6 +4,8 @@ import os
 import re
 from urllib.parse import urlparse
 
+from .leaf_node import LeafNode
+
 
 class JsonExpandOMatic:
     def __init__(self, *, path, logger=logging.getLogger(__name__)):
@@ -18,7 +20,7 @@ class JsonExpandOMatic:
         self.path = os.path.abspath(path)
         self.logger = logger
 
-    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], path_json=False):
+    def expand(self, data, indent=0, root_element="root", preserve=True, leaf_nodes=[], path_json=False):
         """Expand a dict into a collection of subdirectories and json files.
 
         Creates:
@@ -168,35 +170,30 @@ class JsonExpandOMatic:
 
     def _compile_regexs(self, leaf_nodes):
 
-        self.leaf_nodes = []
-        self.other_things = {}
+        self._leaf_nodes = []
+
         if not leaf_nodes:
             return
 
         for p in leaf_nodes:
-            if isinstance(p, str):
-                self.leaf_nodes.append(re.compile(p))
-            elif isinstance(p, dict):
-                for x, y in p.items():
-                    c = re.compile(x)
-                    self.leaf_nodes.append(c)
-                    self.other_things[c] = y
-            else:
-                raise Exception(f"Illegal type for leaf-node: {type(p)} : {p}")
+            # LeafNode.construct will return one or more LeafNode instances.
+            self._leaf_nodes.extend(LeafNode.construct(p))
 
     def _pluck_leaf_node(self, *, path, data, indent, traversal):
 
-        for c in self.leaf_nodes:
+        for c in self._leaf_nodes:
             if not c.match(traversal):
                 continue
 
             with open(f"{path}.json", "w") as f:
                 json.dump(data, f, indent=4, sort_keys=True)
 
-            if c in self.other_things:
+            if c.children:
+                self.logger.debug(" " * indent + ">>> JsonExpandOMatic")
                 JsonExpandOMatic(path=os.path.dirname(path)).expand(
-                    data, preserve=False, leaf_nodes=self.other_things[c], root_element=os.path.basename(path)
+                    data, indent=indent + 2, preserve=False, leaf_nodes=c.children, root_element=os.path.basename(path)
                 )
+                self.logger.debug(" " * indent + "<<< JsonExpandOMatic")
 
             return data
 

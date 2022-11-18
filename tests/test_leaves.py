@@ -1,7 +1,7 @@
 import json
+import os
 
 import jsonref  # type: ignore
-import os
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
@@ -151,7 +151,7 @@ class TestLeaves:
         assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies.json")
         assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies")
 
-    def test_enhanced_nested1(self, tmpdir, test_data, original_data):
+    def xtest_enhanced_nested1(self, tmpdir, test_data, original_data):
         """Enhanced nested #1...
 
         But what if we want a single json file per actor to include
@@ -178,7 +178,8 @@ class TestLeaves:
             [
               {
                 "/root/actors/.*": [
-                  ">/[^/]+/movies/.*"
+                  "/[^/]+/movies/.*",
+                  "<A:/.*"
                 ]
               }
             ]
@@ -189,26 +190,16 @@ class TestLeaves:
         That's normal nested behavior and during normal nested behavior
         of "/[^/]+/movies/.*" expand would create {movie}.json but expand
         any other dict/list found for the actor.
-        The '>' prefix, however, alters the behavior for those paths that
-        are _not_ matched by the expression "/[^/]+/movies/.*". Instead of
-        expanding those dict/list paths that do not match, they are left
-        as-is and will be written to {actor}.json
-
-        If multiple expressions have the '>' prefix, expand will not
-        recurse any path that matches any such expressions.
-
-        THIS TEST IS EXPECTED TO FAIL UNTIL I IMPLEMENT '>'
-        SET ENVIRONMENT VARIABLE SKIP_TEST_ENHANCED_NESTED1 to skip it.
+        The '<A:' prefix, however, alters the behavior for those paths that
+        are matched by the expression "/.*". This expression will be applied
+        after (A) recursion and the result included (<) in their parent.
         """
-
-        if "SKIP_TEST_ENHANCED_NESTED1" in os.environ:
-            return True
 
         JsonExpandOMatic(path=tmpdir).expand(
             test_data,
             root_element="root",
             preserve=False,
-            leaf_nodes=[{"/root/actors/.*": [">/[^/]+/movies/.*", "/[^/]+/filmography"]}],
+            leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "<A:/.*"]}],
         )
 
         # This is the same thing you would expect in the non-nested case.
@@ -225,11 +216,12 @@ class TestLeaves:
         assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies/modern_times.json")
         assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies/0.json")
 
-        # Because of the '>' prefix on ">/[^/]+/movies/.*", the other dicts not
-        # explicitly mentiond in the list of nested expressions should have
-        # been absorbed into each {actor}.json file.
+        # TODO: Explain these assertions
         assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses.json")
         assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses")
+        assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses/lita_grey.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses/lita_grey")
+        assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses/lita_grey/children.json")
         assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies.json")
         assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies")
 
@@ -237,6 +229,7 @@ class TestLeaves:
             data = json.load(f)
             assert data.get("spouses", None)
             assert data.get["spouses"].get("lita_grey", None)
+            assert data.get["spouses"]["lita_grey"].get("children", None)
 
     def _actors_test(self, tmpdir, test_data, original_data, regex):
 
