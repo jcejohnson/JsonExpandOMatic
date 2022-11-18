@@ -24,7 +24,7 @@ def expand(output_path, input_file, *leaf_nodes_input):
     for node in leaf_nodes_input:
         try:
             leaf_nodes.append(json.loads(node))
-        except Exception as e:
+        except Exception:
             leaf_nodes.append(node)
 
     JsonExpandOMatic(path=output_path).expand(
