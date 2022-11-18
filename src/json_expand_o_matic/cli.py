@@ -20,7 +20,7 @@ def main():
 
 def expand(output_path, input_file, *leaf_nodes_input):
 
-    leaf_nodes=[]
+    leaf_nodes = []
     for node in leaf_nodes_input:
         try:
             leaf_nodes.append(json.loads(node))
