@@ -16,7 +16,7 @@ setup(
                 'contract (un-expand) the output of expand() into a dict.',
 
     long_description=long_description,
-    # long_description_content_type='text/markdown',
+    long_description_content_type='text/markdown',
 
     url='https://github.com/jcejohnson/JsonExpandOMatic',
 
