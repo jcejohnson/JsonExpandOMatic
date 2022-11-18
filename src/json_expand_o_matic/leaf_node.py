@@ -7,6 +7,7 @@ class LeafNode:
     do if that leaf node is encoutered.
     """
 
+    # # -- a comment
     # > -- create something.json
     # < -- embed into parent
     # B -- process pattern Before recursion
@@ -89,6 +90,12 @@ class LeafNode:
         r.children = []
         r.commands = m.group(1) if m.group(1) else ""
         r.pattern = m.group(2) if m.group(2) else ""
+
+        if '#' in r.commands:
+            r.comment = True
+            return [r]
+
+        r.comment = False
         r.compiled = None
         r.WHAT = LeafNode.What.DUMP
         r.WHEN = LeafNode.When.BEFORE

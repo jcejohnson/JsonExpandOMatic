@@ -111,7 +111,7 @@ class Expander:
 
         for c in self.leaf_nodes:
 
-            if not c.match(string=self.traversal, when=when):
+            if c.comment or not c.match(string=self.traversal, when=when):
                 continue
 
             if not c.children:
