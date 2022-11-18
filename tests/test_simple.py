@@ -1,12 +1,14 @@
 import json
 
 import jsonref  # type: ignore
+import os
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
 
 
 class TestSimple:
+    """Test the basics."""
 
     # Our raw test data.
     _raw_data = None
@@ -52,6 +54,40 @@ class TestSimple:
 
         # expand() returns a new representation of `data`
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+
+    def test_file_exixtence(self, tmpdir, test_data, original_data):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root")
+
+        # This is the wrapper around the original data
+        assert os.path.exists(f"{tmpdir}/root.json")
+        assert os.path.exists(f"{tmpdir}/root")
+
+        # Now we look at the original data's files
+        assert os.path.exists(f"{tmpdir}/root/actors.json")
+        assert os.path.exists(f"{tmpdir}/root/actors")
+        # A file and directory for each actor
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson")
+        # A file and directory for each actor's movies
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies")
+        # A file and directory Charlie Chaplin's filmography.
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/filmography.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/filmography")
+        # I didn't define filmography test data for Dwayne Johnson.
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/filmography.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/filmography")
+        # But I did define an empty hobbies directory for Dwayne Johnson so we will have
+        # a file but not a directory (since there was nothing to recurse into).
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies")
+
+        # I'm not going to go any deeper. You get the idea...
+        # See `test_leaves.py` for some more interesting things about the files.
 
     def test_contract(self, tmpdir, test_data, original_data):
         expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
