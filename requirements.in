@@ -1,2 +1,2 @@
-colorama
-exitstatus
+colorama~=0.4
+exitstatus~=2.1
