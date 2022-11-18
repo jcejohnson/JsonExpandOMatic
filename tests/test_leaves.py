@@ -51,6 +51,193 @@ class TestLeaves:
         """Like test_charlie1 but with tighter regex."""
         self._charlie_test(tmpdir, test_data, original_data, "/root/actors/[abcxyz][^/]+")
 
+    def test_nested1(self, tmpdir, test_data, original_data):
+        """Test a simple leaf_nodes scenario."""
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}],
+        )
+
+        # This is the same thing you would expect in the non-nested case.
+        self._assert_root(tmpdir)
+        self._assert_actors(tmpdir)
+
+        # Unlike the non-nested case with regex "/root/actors/.*", the nested case
+        # will have a directory per actor.
+        # See the discussion in test_nested1_equivalency on why this is.
+        self._assert_actor_dirs(tmpdir)
+
+        # The nested "/[^/]+/movies/.*" gives us a file-per-movie
+        self._assert_movies(tmpdir)
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies/modern_times.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies/0.json")
+
+        # It is also worth noting that other dicts not explicitly mentiond in the list
+        # of nested expressions are given no special treatment.
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses/oona_oneill.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses/oona_oneill")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses/oona_oneill/children.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies")
+
+    def test_nested1_equivalency(self, tmpdir, test_data, original_data):
+        """
+        In a nested leaf-node expression the dict key is treated as it
+        would be in the non-nested case.
+
+        The nested functionality takes the file written by that expression
+        and feeds it back through JsonExpandOMatic with the dict's value
+        as the new leaf_nodes parameter value.
+
+        You can represent any of the nested expressions as non-tested but,
+        IMO, nested expressions can be easier to follow in some cases.
+        """
+
+        import glob
+
+        JsonExpandOMatic(path=f"{tmpdir}/n").expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}],
+        )
+        nested_files = [x.replace(f"{tmpdir}/n", "") for x in glob.glob(f"{tmpdir}/n", recursive=True)]
+
+        JsonExpandOMatic(path=f"{tmpdir}/f").expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=["/root/actors/.*/movies/.*", "/root/actors/.*/filmography"],
+        )
+        flattened_files = [x.replace(f"{tmpdir}/f", "") for x in glob.glob(f"{tmpdir}/f", recursive=True)]
+
+        assert nested_files == flattened_files
+
+    def test_nested2(self, tmpdir, test_data, original_data):
+        """Test a targeted leaf_node exmple.
+
+        The expressions listed in the dict value are relative to the
+        element matched by the dict key expression.
+        Our previous examlpes used a regex to ignore that but we can do
+        interesting things with it if we want.
+
+        In this example we will collapse all of Dwayne Johnson's movies
+        and Charlie Chaplin's spouses.
+        """
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=[{"/root/actors/.*": ["/dwayne_johnson/movies", "/charlie_chaplin/spouses"]}],
+        )
+
+        # This is the same thing you would expect in the non-nested case.
+        self._assert_root(tmpdir)
+        self._assert_actors(tmpdir)
+
+        # Unlike the non-nested case with regex "/root/actors/.*", the nested case
+        # will have a directory per actor.
+        # See the discussion in test_nested1_equivalency on why this is.
+        self._assert_actor_dirs(tmpdir)
+
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies")
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies")
+
+    def test_enhanced_nested1(self, tmpdir, test_data, original_data):
+        """Enhanced nested #1...
+
+        But what if we want a single json file per actor to include
+        everything about that actor _except_ movies and a separate
+        movies.json for each actor with all of that actor's movie data?
+
+        You might initially have thought that we would do:
+            leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]
+        But we have already established that is equivalent to:
+            leaf_nodes=["/root/actors/.*/movies/.*"]
+        We will stop recursion at each movie but everything else will be
+        done as normal (i.e. - file per dict/list).
+
+        Or maybe you would consider:
+            leaf_nodes=["/root/actors/.*", "/root/actors/.*/movies/.*"]
+        or:
+            leaf_nodes=["/root/actors/.*/movies/.*", "/root/actors/.*"]
+        But that won't work because "/root/actors/.*" will stop recursion
+        before paths matching "/root/actors/.*/movies/.*" are seen.
+        Remember:  All regexes are checked for each path & the first one
+        matching stops recursion.
+
+        This is what we will do:
+            [
+              {
+                "/root/actors/.*": [
+                  ">/[^/]+/movies/.*"
+                ]
+              }
+            ]
+
+        The key of the nested expression ("/root/actors/.*") tells expand
+        start a new JsonExpandOMatic recursion and save the resulting
+        "mangled" data as {actor}.json when that recursion completes.
+        That's normal nested behavior and during normal nested behavior
+        of "/[^/]+/movies/.*" expand would create {movie}.json but expand
+        any other dict/list found for the actor.
+        The '>' prefix, however, alters the behavior for those paths that
+        are _not_ matched by the expression "/[^/]+/movies/.*". Instead of
+        expanding those dict/list paths that do not match, they are left
+        as-is and will be written to {actor}.json
+
+        If multiple expressions have the '>' prefix, expand will not
+        recurse any path that matches any such expressions.
+
+        THIS TEST IS EXPECTED TO FAIL UNTIL I IMPLEMENT '>'
+        SET ENVIRONMENT VARIABLE SKIP_TEST_ENHANCED_NESTED1 to skip it.
+        """
+
+        if "SKIP_TEST_ENHANCED_NESTED1" in os.environ:
+            return True
+
+        JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=[{"/root/actors/.*": [">/[^/]+/movies/.*", "/[^/]+/filmography"]}],
+        )
+
+        # This is the same thing you would expect in the non-nested case.
+        self._assert_root(tmpdir)
+        self._assert_actors(tmpdir)
+
+        # Unlike the non-nested case with regex "/root/actors/.*", the nested case
+        # will have a directory per actor.
+        # See the discussion in test_nested1_equivalency on why this is.
+        self._assert_actor_dirs(tmpdir)
+
+        # The nested "/[^/]+/movies/.*" gives us a file-per-movie
+        self._assert_movies(tmpdir)
+        assert os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies/modern_times.json")
+        assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies/0.json")
+
+        # Because of the '>' prefix on ">/[^/]+/movies/.*", the other dicts not
+        # explicitly mentiond in the list of nested expressions should have
+        # been absorbed into each {actor}.json file.
+        assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/spouses")
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies.json")
+        assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies")
+
+        with open(f"{tmpdir}/root/actors/charlie_chaplin.json") as f:
+            data = json.load(f)
+            assert data.get("spouses", None)
+            assert data.get["spouses"].get("lita_grey", None)
+
     def _actors_test(self, tmpdir, test_data, original_data, regex):
 
         expanded = JsonExpandOMatic(path=tmpdir).expand(
