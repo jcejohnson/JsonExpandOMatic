@@ -23,7 +23,7 @@ class LeafNode:
     #
     # If mutually exclusive commands are present,
     # the last one wins.
-    command_and_expression = re.compile("^([ ><BAp]+:)?(.*)$")
+    command_and_expression = re.compile("^([ ><BAFfPp#]+:)?(.*)$")
 
     class What(enum.Enum):
         DUMP = 1
