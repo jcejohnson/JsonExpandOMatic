@@ -18,12 +18,20 @@ def main():
         raise Exception(f"Unknown request [{sys.argv[1]}]")
 
 
-def expand(output_path, input_file, *leaf_nodes):
+def expand(output_path, input_file, *leaf_nodes_input):
+
+    leaf_nodes=[]
+    for node in leaf_nodes_input:
+        try:
+            leaf_nodes.append(json.loads(node))
+        except Exception as e:
+            leaf_nodes.append(node)
 
     JsonExpandOMatic(path=output_path).expand(
-        json.load(open(input_file)),
+        data=json.load(open(input_file)),
+        root_element="root",
         preserve=False,
-        # leaf_nodes=leaf_nodes
+        leaf_nodes=leaf_nodes
         # leaf_nodes=["/.*"]
         # leaf_nodes=["/root/actors/.*/movies/.*"]
         # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]
