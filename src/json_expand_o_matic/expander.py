@@ -1,3 +1,5 @@
+import collections
+import hashlib
 import json
 import os
 
@@ -7,7 +9,9 @@ from .leaf_node import LeafNode
 class Expander:
     """Expand a dict or list into one or more json files."""
 
-    def __init__(self, *, logger, path, data, leaf_nodes):
+    HASH_MD5 = "HASH_MD5"
+
+    def __init__(self, *, logger, path, data, leaf_nodes, **options):
 
         assert isinstance(data, dict) or isinstance(data, list)
 
@@ -16,13 +20,29 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
+        self.hash_mode = options.get("hash_mode", None)
+        if self.hash_mode == Expander.HASH_MD5:
+            self._hash_function = self._hash_md5
+        else:
+            self._hash_function = lambda *args, **kwargs: False
+
+        # Map hashcodes of dict objects to the json files they are saved as.
+        #   key   -- hashcode as specified by self.hash_mode
+        #   value -- list of files w/ hashcode
+        # We can use these in a 2nd pass to create $refs to identical objects.
+        self.hashcodes = collections.defaultdict(lambda: list())
+
     def execute(self):
         """Expand self.data into one or more json files."""
 
         # Replace the _dump() method with a no-op for the root of the data.
         self._dump = lambda *args: None
 
-        return self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+        expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+
+        self._hashcodes_cleanup()
+
+        return expansion
 
     def _execute(self, traversal, indent, my_path_component):
         """Main...
@@ -84,6 +104,9 @@ class Expander:
         """Dump self.data to "{self.path}.json" if leaf_node.WHAT == LeafNode.What.DUMP
         and set self.data = {"$ref": f"{directory}/{filename}"}
 
+        if self.hash_mode, calculate a hashcode for "{self.path}.json" and save
+        as "{self.path}.xxx" (where `xxx` depends on the hash function selected).
+
         Always returns True so that _is_leaf_node() is less gross.
         """
 
@@ -92,13 +115,16 @@ class Expander:
 
         directory = os.path.dirname(self.path)
         filename = f"{self.path}.json"
-        try:
-            with open(filename, "w") as f:
-                json.dump(self.data, f, indent=4, sort_keys=True)
-        except FileNotFoundError:
-            os.makedirs(directory)
-            with open(filename, "w") as f:
-                json.dump(self.data, f, indent=4, sort_keys=True)
+
+        # Use tabs for indents.
+        # This will save a surprising amount of space in large files.
+        dumps = json.dumps(self.data, indent="\t", sort_keys=True)
+
+        self._json_save(directory, filename, dumps)
+
+        checksum = self._hash_function(dumps)
+        if checksum:
+            self.hashcodes[checksum].append(filename)
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
@@ -106,6 +132,23 @@ class Expander:
         self.data = {"$ref": f"{directory}/{filename}"}
 
         return True
+
+    def _hashcodes_cleanup(self):
+        """Strip self.path from the hashcodes' files in case we want to make $refs from them.
+        Also removes any entries having less than two files.
+        """
+        l = len(self.path) + 1
+        self.hashcodes = {k: [f[l:] for f in v] for k, v in self.hashcodes.items() if len(v) > 1}
+
+    def _hash_md5(self, dumps):
+        """Compute and save the md5 hashcode of `dumps`.
+        Returns checksum.
+        """
+        checksum = hashlib.md5(dumps.encode()).hexdigest()
+        filename = f"{self.path}.md5"
+        with open(filename, "w") as f:
+            f.write(checksum)
+        return checksum
 
     def _is_leaf_node(self, when):
 
@@ -130,6 +173,20 @@ class Expander:
 
         return False
 
+    def _json_save(self, directory, filename, dumps):
+
+        try:
+            # Assume that the path will already exist.
+            # We'll take a hit on the first file in each new path but save the overhead
+            # of checking on each subsequent one. This assumes that most objects will
+            # have multiple nested objects.
+            with open(filename, "w") as f:
+                f.write(dumps)
+        except FileNotFoundError:
+            os.makedirs(directory)
+            with open(filename, "w") as f:
+                f.write(dumps)
+
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
 
@@ -140,11 +197,23 @@ class Expander:
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        self.data[key] = Expander(
+        expander = Expander(
             logger=self.logger,
             path=os.path.join(self.path, path_component),
             data=self.data[key],
             leaf_nodes=self.leaf_nodes,
-        )._execute(indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}")
+            hash_mode=self.hash_mode,
+        )
+        self.data[key] = expander._execute(
+            indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}"
+        )
+
+        # Add the child's hashcodes to our own so that when we unroll the recursion the root
+        # will not need to recurse again to collect the entire list.
+        for hashcode in expander.hashcodes:
+            if hashcode in self.hashcodes:
+                self.hashcodes[hashcode] += expander.hashcodes[hashcode]
+            else:
+                self.hashcodes[hashcode] = expander.hashcodes[hashcode]
 
         # self.data[key] = {"$ref": f"{self.my_path_component}/{path_component}.json"}

@@ -18,11 +18,8 @@ if [ ! -d venv ] ; then
   touch requirements.txt dev-requirements.in
 fi
 
-(
-  set -x
-  [ requirements.in -nt requirements.txt ] && venv/bin/pip-compile requirements.in
-  [ dev-requirements.in -nt dev-requirements.txt ] && venv/bin/pip-compile dev-requirements.in
-)
+[ requirements.in -nt requirements.txt ] && venv/bin/pip-compile requirements.in
+[ dev-requirements.in -nt dev-requirements.txt ] && venv/bin/pip-compile dev-requirements.in
 
 [ -x venv/bin/JsonExpandOMatic ] || (set -x ; venv/bin/pip install -e .)
 
