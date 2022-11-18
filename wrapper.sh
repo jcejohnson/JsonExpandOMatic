@@ -5,7 +5,12 @@
 self=$(basename $0)
 
 if [ ! -d venv ] ; then
-  (set -x ; python3 -m venv venv)
+  (
+    set -x
+    python3 -m venv venv
+    venv/bin/pip install --upgrade pip
+    venv/bin/pip install pip-tools
+  )
   # Force an update of *requirements.txt for _this_ version of python
   # (for instance, 3.6 will want dataclasses==0.8 but that fails for 3.8)
   touch requirements.in dev-requirements.in
@@ -15,8 +20,6 @@ if [ requirements.in -nt requirements.txt ] || [ dev-requirements.in -nt dev-req
 then
   (
     set -x
-    venv/bin/pip install --upgrade pip
-    venv/bin/pip install pip-tools
     venv/bin/pip-compile requirements.in
     venv/bin/pip-compile dev-requirements.in
   )
