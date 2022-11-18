@@ -41,18 +41,18 @@ jobs:
       # Creates venv upgrades pip, installs dependencies, etc. exactly as we do for development.
       - name: setup
         run: |
-        ./wrapper.sh
-        ./expand.sh --version
+          ./wrapper.sh
+          ./expand.sh --version
 
       - name: test
         run: |
           ./tox.sh
 
-    - name: publish
-      run: |
-        python3 setup.py sdist bdist_wheel
-        python3 -m twine upload dist/*
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        TWINE_REPOSITORY: testpypi
+      - name: publish
+        run: |
+          python3 setup.py sdist bdist_wheel
+          python3 -m twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          TWINE_REPOSITORY: testpypi
