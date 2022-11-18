@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 from urllib.parse import urlparse
 
 from .leaf_node import LeafNode
@@ -20,7 +19,7 @@ class JsonExpandOMatic:
         self.path = os.path.abspath(path)
         self.logger = logger
 
-    def expand(self, data, indent=0, root_element="root", preserve=True, leaf_nodes=[], path_json=False):
+    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[]):
         """Expand a dict into a collection of subdirectories and json files.
 
         Creates:
@@ -40,12 +39,6 @@ class JsonExpandOMatic:
             A list of regular expressions.
             Recursion stops if the current path into the data matches an item
             in this list.
-        path_json : bool
-            If set, f"{self.path}.json" will be created.
-            This may sound like a good idea but it is redundant and confusing.
-            We already have one "extra" layer over our data (root_element) and
-            path_json=True is just adding another. It's only worth enabling to
-            see why you don't want to enable it.
 
         Returns:
         --------
@@ -56,14 +49,11 @@ class JsonExpandOMatic:
         if preserve:
             data = json.loads(json.dumps(data))
 
-        self._path_json = path_json
+        from .expander import Expander
 
-        self._compile_regexs(leaf_nodes)
-
-        r = self._expand(path=self.path, data={root_element: data}, my_path_component=os.path.basename(self.path))
-
-        # Cleanup before leaving.
-        self.leaf_nodes = None
+        r = Expander(
+            logger=self.logger, path=self.path, data={root_element: data}, leaf_nodes=LeafNode.construct(leaf_nodes)
+        ).execute()
 
         return r
 
@@ -87,69 +77,6 @@ class JsonExpandOMatic:
         """
         return self._contract(path=[self.path], data=self._slurp(self.path, f"{root_element}.json"))
 
-    ########################################
-    # primary implementations
-
-    def _expand(self, *, path, data, indent=0, traversal="", my_path_component=None):
-        """Recursive expansion method.
-
-        Parameters
-        ----------
-        path : str
-            Fully qualified filesystem path where the data will be written.
-        data : dict or list
-            The data to be expanded.
-        indent : int
-            Used to indent log messages so that we can see the data tree.
-        traversal : string
-            A '/' separated path into the json doc.
-            This is ${path} with self.path removed & is what we match against
-            the self.leaf_nodes regular expressions.
-
-        Returns:
-        --------
-        dict
-            data
-        """
-        self.logger.debug(" " * indent + f"path [{path}] traversal [{traversal}]")
-
-        assert isinstance(data, dict) or isinstance(data, list)
-
-        if self._pluck_leaf_node(path=path, data=data, indent=indent, traversal=traversal):
-            return data
-
-        if not os.path.exists(path):
-            os.mkdir(path)
-
-        context = {
-            "path": path,
-            "data": data,
-            "indent": indent,
-            "traversal": traversal,
-            "my_path_component": my_path_component,
-        }
-
-        if isinstance(data, dict):
-            for key in sorted(data.keys()):
-                self._recursively_expand(key=key, **context)
-
-        elif isinstance(data, list):
-            for key, _ in enumerate(data):
-                self._recursively_expand(key=key, **context)
-
-        try:
-            os.rmdir(path)
-        except Exception:
-            pass
-
-        if not traversal and not self._path_json:
-            return data
-
-        with open(f"{path}.json", "w") as f:
-            json.dump(data, f, indent=4, sort_keys=True)
-
-        return data
-
     def _contract(self, *, path, data):
 
         if isinstance(data, list):
@@ -164,57 +91,6 @@ class JsonExpandOMatic:
                 data[k] = self._contract(path=path, data=v)
 
         return data
-
-    ########################################
-    # _expand support
-
-    def _compile_regexs(self, leaf_nodes):
-
-        self._leaf_nodes = []
-
-        if not leaf_nodes:
-            return
-
-        for p in leaf_nodes:
-            # LeafNode.construct will return one or more LeafNode instances.
-            self._leaf_nodes.extend(LeafNode.construct(p))
-
-    def _pluck_leaf_node(self, *, path, data, indent, traversal):
-
-        for c in self._leaf_nodes:
-            if not c.match(traversal):
-                continue
-
-            with open(f"{path}.json", "w") as f:
-                json.dump(data, f, indent=4, sort_keys=True)
-
-            if c.children:
-                self.logger.debug(" " * indent + ">>> JsonExpandOMatic")
-                JsonExpandOMatic(path=os.path.dirname(path)).expand(
-                    data, indent=indent + 2, preserve=False, leaf_nodes=c.children, root_element=os.path.basename(path)
-                )
-                self.logger.debug(" " * indent + "<<< JsonExpandOMatic")
-
-            return data
-
-    def _recursively_expand(self, *, path, data, indent, traversal, my_path_component, key):
-
-        if not (isinstance(data[key], dict) or isinstance(data[key], list)):
-            return
-
-        path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
-        self._expand(
-            path=os.path.join(path, path_component),
-            data=data[key],
-            indent=indent + 2,
-            traversal=f"{traversal}/{key}",
-            my_path_component=path_component,
-        )
-
-        data[key] = {"$ref": f"{my_path_component}/{path_component}.json"}
-
-    ########################################
-    # _contract support
 
     def _something_to_follow(self, k, v):
 

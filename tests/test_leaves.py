@@ -1,7 +1,6 @@
 import json
 import os
 
-import jsonref  # type: ignore
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
@@ -59,6 +58,7 @@ class TestLeaves:
             preserve=False,
             leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}],
         )
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         # This is the same thing you would expect in the non-nested case.
         self._assert_root(tmpdir)
@@ -134,6 +134,7 @@ class TestLeaves:
             preserve=False,
             leaf_nodes=[{"/root/actors/.*": ["/dwayne_johnson/movies", "/charlie_chaplin/spouses"]}],
         )
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         # This is the same thing you would expect in the non-nested case.
         self._assert_root(tmpdir)
@@ -258,6 +259,7 @@ class TestLeaves:
         expanded = JsonExpandOMatic(path=tmpdir).expand(
             test_data, root_element="root", preserve=False, leaf_nodes=[regex]
         )
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         self._assert_root(tmpdir)
         self._assert_actors(tmpdir)
