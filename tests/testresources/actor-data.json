@@ -1,0 +1,56 @@
+{
+  "actors": {
+    "charlie_chaplin": {
+      "birth_year": 1889,
+      "filmography": [
+        [
+          "The Kid",
+          1921
+        ],
+        [
+          "A Woman of Paris",
+          1923
+        ],
+        [
+          "Modern Times",
+          1936
+        ]
+      ],
+      "first_name": "Charlie",
+      "is_funny": true,
+      "last_name": "Chaplin",
+      "movies": {
+        "modern_times": {
+          "budget": 1500000,
+          "run_time_minutes": 87,
+          "title": "Modern Times",
+          "year": 1936
+        }
+      }
+    },
+    "dwayne_johnson": {
+      "first_name": "Dwayne",
+      "hobbies": {},
+      "last_name": "Johnson",
+      "movies": [
+        {
+          "cast": {
+            "brian_oconner": {
+              "actor": "paul_walker",
+              "name": "Brian O'Conner"
+            },
+            "dominic_toretto": {
+              "actor": "vin_diesel",
+              "name": "Dominic Toretto"
+            },
+            "mia_toretto": {
+              "actor": "jordana_brewster",
+              "name": "Mia Toretto"
+            }
+          },
+          "title": "Fast Five"
+        }
+      ]
+    }
+  }
+}
