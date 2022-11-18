@@ -5,6 +5,8 @@ from .leaf_node import LeafNode
 
 
 class Expander:
+    """Expand a dict or list into one or more json files."""
+
     def __init__(self, *, logger, path, data, leaf_nodes):
 
         assert isinstance(data, dict) or isinstance(data, list)
@@ -15,10 +17,15 @@ class Expander:
         self.leaf_nodes = leaf_nodes
 
     def execute(self):
+        """Expand self.data into one or more json files."""
+
+        # Replace the _dump() method with a no-op for the root of the data.
+        self._dump = lambda *args: None
+
         return self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
 
     def _execute(self, traversal, indent, my_path_component):
-        """Recursive expansion method.
+        """Main...
 
         Parameters
         ----------
@@ -44,28 +51,32 @@ class Expander:
 
         self._log(f"path [{self.path}] traversal [{self.traversal}]")
 
-        if self._is_leaf_node():
+        if self._is_leaf_node(LeafNode.When.BEFORE):
             return self.data
 
-        if not os.path.exists(self.path):
-            os.mkdir(self.path)
+        self._mkdirs()
 
         for key in self._data_iter():
             self._recursively_expand(key=key)
 
-        try:
-            os.rmdir(self.path)
-        except Exception:
-            pass
+        self._cleanup()
 
-        if not traversal:
+        if self._is_leaf_node(LeafNode.When.AFTER):
             return self.data
 
+        # If no LeafNode has matched, our default
+        # action is to dump self.data to a file.
         self._dump()
 
         return self.data
 
     ########################################
+
+    def _cleanup(self):
+        try:
+            os.rmdir(self.path)
+        except Exception:
+            pass
 
     def _data_iter(self):
 
@@ -80,9 +91,14 @@ class Expander:
         return None
 
     def _dump(self, leaf_node=None):
+        """Dump self.data to "{self.path}.json" if leaf_node.WHAT == LeafNode.What.DUMP
+        and set self.data = {"$ref": f"{directory}/{filename}"}
+
+        Always returns True so that _is_leaf_node() is less gross.
+        """
 
         if leaf_node and not leaf_node.WHAT == LeafNode.What.DUMP:
-            return self.data
+            return True
 
         filename = f"{self.path}.json"
         with open(filename, "w") as f:
@@ -91,32 +107,39 @@ class Expander:
         # Build a reference to the file we just wrote.
         directory = os.path.basename(os.path.dirname(self.path))
         filename = os.path.basename(filename)
-        return {"$ref": f"{directory}/{filename}"}
+        self.data = {"$ref": f"{directory}/{filename}"}
 
-    def _log(self, string):
-        self.logger.debug(" " * self.indent + string)
+        return True
 
-    def _is_leaf_node(self):
+    def _is_leaf_node(self, when):
 
         for c in self.leaf_nodes:
-            if not c.match(self.traversal):
+
+            if not c.match(string=self.traversal, when=when):
                 continue
 
             if not c.children:
                 return self._dump(c)
 
-            self._log(">>> Expander")
+            self._log(f">>> Expand children of [{c.raw}]")
             Expander(
                 logger=self.logger,
                 path=os.path.dirname(self.path),
                 data={os.path.basename(self.path): self.data},
                 leaf_nodes=c.children,
             )._execute(indent=self.indent + 2, my_path_component=os.path.basename(self.path), traversal="")
-            self._log("<<< Expander")
+            self._log(f"<<< Expand children of [{c.raw}]")
 
             return self._dump(c)
 
-        return None
+        return False
+
+    def _log(self, string):
+        self.logger.debug(" " * self.indent + string)
+
+    def _mkdirs(self):
+        if not os.path.exists(self.path):
+            os.mkdir(self.path)
 
     def _recursively_expand(self, *, key):
 
@@ -125,13 +148,11 @@ class Expander:
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        r = Expander(
+        self.data[key] = Expander(
             logger=self.logger,
             path=os.path.join(self.path, path_component),
             data=self.data[key],
             leaf_nodes=self.leaf_nodes,
         )._execute(indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}")
 
-        self.data[key] = {"$ref": f"{self.my_path_component}/{path_component}.json"}
-
-        return r
+        # self.data[key] = {"$ref": f"{self.my_path_component}/{path_component}.json"}
