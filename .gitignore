@@ -1,15 +1,21 @@
-# general things to ignore
-build/
-dist/
-*.egg-info/
+# things to ignore
+
 *.egg
+*.egg-info/
 *.py[cod]
-__pycache__/
 *.so
 *~
-
-# due to using tox and pytest
-.tox
 .cache
-venv
+.coverage
+.eggs/
+.tox
+__pycache__/
+build/
+dist/
 foo
+htmlcov/
+venv
+
+# https://github.com/johnthagen/python-blueprint
+# This is what I used to stamp out the original project structure.
+python-blueprint/
