@@ -8,6 +8,7 @@ self=$(basename $0)
 
 if [ requirements.in -nt requirements.txt ] || [ dev-requirements.in -nt dev-requirements.txt ]
 then
+  venv/bin/pip install --upgrade pip
   venv/bin/pip install pip-tools
   venv/bin/pip-compile requirements.in
   venv/bin/pip-compile dev-requirements.in
