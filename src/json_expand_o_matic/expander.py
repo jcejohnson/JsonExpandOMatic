@@ -54,12 +54,8 @@ class Expander:
         if self._is_leaf_node(LeafNode.When.BEFORE):
             return self.data
 
-        self._mkdirs()
-
         for key in self._data_iter():
             self._recursively_expand(key=key)
-
-        self._cleanup()
 
         if self._is_leaf_node(LeafNode.When.AFTER):
             return self.data
@@ -71,12 +67,6 @@ class Expander:
         return self.data
 
     ########################################
-
-    def _cleanup(self):
-        try:
-            os.rmdir(self.path)
-        except Exception:
-            pass
 
     def _data_iter(self):
 
@@ -100,12 +90,18 @@ class Expander:
         if leaf_node and not leaf_node.WHAT == LeafNode.What.DUMP:
             return True
 
+        directory = os.path.dirname(self.path)
         filename = f"{self.path}.json"
-        with open(filename, "w") as f:
-            json.dump(self.data, f, indent=4, sort_keys=True)
+        try:
+            with open(filename, "w") as f:
+                json.dump(self.data, f, indent=4, sort_keys=True)
+        except FileNotFoundError as e:
+            os.makedirs(directory)
+            with open(filename, "w") as f:
+                json.dump(self.data, f, indent=4, sort_keys=True)
 
         # Build a reference to the file we just wrote.
-        directory = os.path.basename(os.path.dirname(self.path))
+        directory = os.path.basename(directory)
         filename = os.path.basename(filename)
         self.data = {"$ref": f"{directory}/{filename}"}
 
@@ -136,10 +132,6 @@ class Expander:
 
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
-
-    def _mkdirs(self):
-        if not os.path.exists(self.path):
-            os.mkdir(self.path)
 
     def _recursively_expand(self, *, key):
 
