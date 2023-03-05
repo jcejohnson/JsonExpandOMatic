@@ -42,7 +42,7 @@ Setup wrapper scripts:
 
 Install for development:
 
-    ./expand.sh --version
+    ./tox.sh
 
 Do a thing:
 

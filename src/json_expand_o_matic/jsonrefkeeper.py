@@ -36,7 +36,6 @@ from proxytypes import CallbackProxy  # type: ignore
 
 
 class JsonRefWrapper(CallbackProxy):
-
     writer = False
 
     __notproxied__ = ("__jsonref__",)

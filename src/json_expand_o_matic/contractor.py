@@ -10,17 +10,14 @@ class Contractor:
         self.root_element = root_element
 
     def execute(self):
-
         return self._contract(path=[self.path], data=self._slurp(self.path, f"{self.root_element}.json"))
 
     def _contract(self, *, path, data):
-
         if isinstance(data, list):
             for k, v in enumerate(data):
                 data[k] = self._contract(path=path, data=v)
 
         elif isinstance(data, dict):
-
             for k, v in data.items():
                 if self._something_to_follow(k, v):
                     return self._contract(path=path + [os.path.dirname(v)], data=self._slurp(*path, v))
@@ -29,7 +26,6 @@ class Contractor:
         return data
 
     def _something_to_follow(self, k, v):
-
         if k != "$ref":
             return False
 

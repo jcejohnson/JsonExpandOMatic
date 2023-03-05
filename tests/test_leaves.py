@@ -233,7 +233,6 @@ class TestLeaves:
             assert data.get["spouses"]["lita_grey"].get("children", None)
 
     def _actors_test(self, tmpdir, test_data, original_data, regex):
-
         expanded = JsonExpandOMatic(path=tmpdir).expand(
             test_data, root_element="root", preserve=False, leaf_nodes=[regex]
         )
@@ -273,13 +272,11 @@ class TestLeaves:
         # etc...
 
     def _assert_root(self, tmpdir):
-
         # This is the wrapper around the original data
         assert os.path.exists(f"{tmpdir}/root.json")
         assert os.path.exists(f"{tmpdir}/root")
 
     def _assert_actors(self, tmpdir):
-
         # Now we look at the original data's files
         assert os.path.exists(f"{tmpdir}/root/actors.json")
 
@@ -288,7 +285,6 @@ class TestLeaves:
         assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson.json")
 
     def _assert_actor_dirs(self, tmpdir, f=lambda x: x):
-
         # Now we look at the original data's files
         assert os.path.exists(f"{tmpdir}/root/actors.json")
 
@@ -301,7 +297,6 @@ class TestLeaves:
         assert f(os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson"))
 
     def _assert_movies(self, tmpdir, f=lambda x: x):
-
         assert f(os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies.json"))
         assert f(os.path.exists(f"{tmpdir}/root/actors/charlie_chaplin/movies"))
         assert f(os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies.json"))

@@ -12,7 +12,6 @@ class Expander:
     HASH_MD5 = "HASH_MD5"
 
     def __init__(self, *, logger, path, data, leaf_nodes, **options):
-
         assert isinstance(data, dict) or isinstance(data, list)
 
         self.logger = logger
@@ -89,7 +88,6 @@ class Expander:
     ########################################
 
     def _data_iter(self):
-
         if isinstance(self.data, dict):
             for key in sorted(self.data.keys()):
                 yield key
@@ -151,9 +149,7 @@ class Expander:
         return checksum
 
     def _is_leaf_node(self, when):
-
         for c in self.leaf_nodes:
-
             if c.comment or not c.match(string=self.traversal, when=when):
                 continue
 
@@ -174,7 +170,6 @@ class Expander:
         return False
 
     def _json_save(self, directory, filename, dumps):
-
         try:
             # Assume that the path will already exist.
             # We'll take a hit on the first file in each new path but save the overhead
@@ -191,7 +186,6 @@ class Expander:
         self.logger.debug(" " * self.indent + string)
 
     def _recursively_expand(self, *, key):
-
         if not (isinstance(self.data[key], dict) or isinstance(self.data[key], list)):
             return
 
