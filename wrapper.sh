@@ -40,8 +40,4 @@ case ${self} in
     ;;
 esac
 
-if [[ "$1" =~ --* ]] ; then
-  exec venv/bin/JsonExpandOMatic "$@"
-fi
-
 exec venv/bin/JsonExpandOMatic "${self/.sh}" "$@"

@@ -1,31 +1,54 @@
 import json
+import logging
 import sys
 
-from . import JsonExpandOMatic
+from . import VERSION, JsonExpandOMatic
 
 # NOTE: This isn't meant to be a fully functional cli.
 #       Mostly because I don't want to impose a dependency (click) on you.
 #       It is simply here as a quick way to interact with the library.
 
 
+def usage():
+    myself = sys.argv[0].split("/")[-1]
+    print(f"{myself} expand <output-path> <input-file> [<leaf-nodes-spec> ...]")
+    print(f"{myself} contract <input-path> [<root-element>]")
+
+
 def main():
+    cmd = sys.argv[1]
+    argv = sys.argv[2:]
 
-    if sys.argv[1] == "--help":
-        myself = sys.argv[0].split("/")[-1]
-        print(f"{myself} expand <output-path> <input-file> [<leaf-nodes-spec> ...]")
-        print(f"{myself} contract <input-path> [<root-element>]")
-    elif sys.argv[1] == "--version":
-        print("v0.1.5")
-    elif sys.argv[1] == "expand":
-        expand(*sys.argv[2:])
-    elif sys.argv[1] == "contract":
-        contract(*sys.argv[2:])
+    if not argv or sys.argv[2] == "--help" or "--help" in argv:
+        usage()
+        return
+
+    if sys.argv[2] == "--version":
+        print(VERSION)
+        return
+
+    if sys.argv[2] == "--log-level":
+        logger = _get_expando_logger(sys.argv[3])
+        argv = sys.argv[4:]
     else:
-        raise Exception(f"Unknown request [{sys.argv[1]}]")
+        logger = _get_expando_logger(logging.INFO)
+
+    if not argv:
+        usage()
+        return
+
+    if cmd == "expand":
+        expand(logger, *argv)
+        return
+
+    if cmd == "contract":
+        contract(logger, *argv)
+        return
+
+    raise Exception(f"Unknown request [{cmd}]")
 
 
-def expand(output_path, input_file, *leaf_nodes_input):
-
+def expand(logger, output_path, input_file, *leaf_nodes_input):
     leaf_nodes = []
     for node in leaf_nodes_input:
         try:
@@ -35,7 +58,7 @@ def expand(output_path, input_file, *leaf_nodes_input):
 
     from .expander import Expander
 
-    JsonExpandOMatic(path=output_path).expand(
+    JsonExpandOMatic(logger=logger, path=output_path).expand(
         data=json.load(open(input_file)),
         root_element="root",
         preserve=False,
@@ -67,16 +90,29 @@ def expand(output_path, input_file, *leaf_nodes_input):
     #    leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}]
 
 
-def contract(input_path, root_element="root"):
-
+def contract(logger, input_path, root_element="root"):
     print(
         json.dumps(
             # You can also contract with jsonref (see the tests).
             # Our contract() method is here for convenience.
             # Due to its simple nature, it is also a bit more lightweight
             # than jsonref.
-            JsonExpandOMatic(path=input_path).contract(root_element=root_element),
+            JsonExpandOMatic(logger=logger, path=input_path).contract(root_element=root_element),
             indent=4,
             sort_keys=True,
         )
     )
+
+
+def _get_expando_logger(level):
+    logging.basicConfig(level=level)
+    logger = logging.getLogger(JsonExpandOMatic.__name__)
+
+    try:
+        import coloredlogs
+
+        coloredlogs.install(level=level, logger=logger)
+    except ModuleNotFoundError:
+        pass
+
+    return logger
