@@ -1,4 +1,5 @@
 bump2version
+coloredlogs
 tox
 pytest
 pytest-cov

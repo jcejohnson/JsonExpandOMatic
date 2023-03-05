@@ -13,13 +13,13 @@ if [ ! -d venv ] ; then
   )
   # Force the `if` below to _not_ recomplie requirements*txt so that we
   #   use what the develop has explicitly requested in them.
-  # Recompiling them is handy sometimes but a bit obnoxious for a 
+  # Recompiling them is handy sometimes but a bit obnoxious for a
   #   reusable library.
   touch requirements.txt dev-requirements.in
 fi
 
-[ requirements.in -nt requirements.txt ] && venv/bin/pip-compile requirements.in
-[ dev-requirements.in -nt dev-requirements.txt ] && venv/bin/pip-compile dev-requirements.in
+[ requirements.in -nt requirements.txt ] && venv/bin/pip-compile --resolver=backtracking requirements.in
+[ dev-requirements.in -nt dev-requirements.txt ] && venv/bin/pip-compile --resolver=backtracking dev-requirements.in
 
 [ -x venv/bin/JsonExpandOMatic ] || (set -x ; venv/bin/pip install -e .)
 
