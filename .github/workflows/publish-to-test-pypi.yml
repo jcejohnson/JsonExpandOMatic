@@ -29,18 +29,18 @@ jobs:
     name: Build, test and upload to TestPyPI
 
     # The type of runner that the job will run on
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       # Sets up python3
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: 3.9
 
       # Creates venv upgrades pip, installs dependencies, etc. exactly as we do for development.
       - name: setup
