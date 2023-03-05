@@ -19,6 +19,8 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
+        self.ref_key = options.get("ref_key", "$ref")
+
         self.hash_mode = options.get("hash_mode", None)
         if self.hash_mode == Expander.HASH_MD5:
             self._hash_function = self._hash_md5
@@ -127,7 +129,7 @@ class Expander:
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
         filename = os.path.basename(filename)
-        self.data = {"$ref": f"{directory}/{filename}"}
+        self.data = {self.ref_key: f"{directory}/{filename}"}
 
         return True
 

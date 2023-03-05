@@ -109,7 +109,7 @@ def _get_expando_logger(level):
     logger = logging.getLogger(JsonExpandOMatic.__name__)
 
     try:
-        import coloredlogs
+        import coloredlogs  # type: ignore
 
         coloredlogs.install(level=level, logger=logger)
     except ModuleNotFoundError:

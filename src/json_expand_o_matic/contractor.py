@@ -4,10 +4,12 @@ from urllib.parse import urlparse
 
 
 class Contractor:
-    def __init__(self, *, logger, path, root_element):
+    def __init__(self, *, logger, path, root_element, **options):
         self.logger = logger
         self.path = path
         self.root_element = root_element
+
+        self.ref_key = options.get("ref_key", "$ref")
 
     def execute(self):
         return self._contract(path=[self.path], data=self._slurp(self.path, f"{self.root_element}.json"))
@@ -26,7 +28,7 @@ class Contractor:
         return data
 
     def _something_to_follow(self, k, v):
-        if k != "$ref":
+        if k != self.ref_key:
             return False
 
         url_details = urlparse(v)
