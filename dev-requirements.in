@@ -11,3 +11,4 @@ black
 isort
 Sphinx
 jsonref
+pydantic

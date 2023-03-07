@@ -94,6 +94,8 @@ pluggy==1.0.0
     #   tox
 pycodestyle==2.10.0
     # via flake8
+pydantic==1.10.5
+    # via -r dev-requirements.in
 pyflakes==3.0.1
     # via flake8
 pygments==2.14.0
@@ -141,6 +143,7 @@ typing-extensions==4.5.0
     # via
     #   black
     #   mypy
+    #   pydantic
 urllib3==1.26.14
     # via requests
 virtualenv==20.20.0
