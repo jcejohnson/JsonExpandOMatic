@@ -5,7 +5,7 @@ import jsonref  # type: ignore
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
-from tests.testresources.model import LazyBaseModel, Model
+from tests.testresources.model import LazyModelParser, Model
 
 
 class TestLazyLoading:
@@ -60,8 +60,23 @@ class TestLazyLoading:
         with open(f"{tmpdir}/root.json") as f:
             root = json.load(f)
 
-        LazyBaseModel.Config.lazy_loader_anchor = str(tmpdir)
-        model = Model.parse_obj(root)
+        assert root == {"actors": {"$ref": "root/actors.json"}}
+
+        # root.update({
+        #     # $ref is ignored. It is the file that causes Model to exist.
+        #     "$ref": f"{tmpdir.basename}/root.json",
+        #     # $type is also ignored, it is the non-lazy object in root.json.
+        #     "$type": Model,
+        #     # $base is required so that the fields of Model have an anchor
+        #     # for their referenced json files.
+        #     "$base": str(tmpdir)
+        # })
+
+        model = LazyModelParser[Model].lazy_load(
+            ref="root.json",
+            model_clazz=Model,
+            base=tmpdir
+        )
 
         charlie_chaplin = model.actors["charlie_chaplin"]
         print(charlie_chaplin)
