@@ -1,112 +1,32 @@
-import json
-import os
-
-from collections import UserDict
-from collections.abc import MutableMapping
-from typing import Any, Dict, Generic, List, TypeVar, Union
-
+from typing import Any, List, Union
 from pydantic import BaseModel as PydanticBaseModel
-from pydantic import Field, PrivateAttr, constr, parse_obj_as, root_validator, create_model
-from pydantic.generics import GenericModel
-from pydantic.generics import _assigned_parameters as GenericModelDetails
+from pydantic import Field
 
-KeyT = TypeVar("KeyT")
-ValueT = TypeVar("ValueT")
-
-ModelT = TypeVar("ModelT", bound=PydanticBaseModel)
-
-LazyKey = constr(regex="\\$(base|ref)")
+from .lazy import LazyDict, LazyBaseModel, LazyList, LazyParserMixin
 
 
-class LazyModel(PydanticBaseModel):
-    lazy_ref: str = Field(..., alias="$ref")
-    lazy_bass: str = Field(..., alias="$base")
-
-    @root_validator(pre=True)
-    @classmethod
-    def lazy_base_model_root_validator(cls, values):
-
-        for key, value in values.items():
-            if not isinstance(value, MutableMapping):
-                continue
-            if "$ref" in value:
-                value["$base"] = os.path.join(values["$base"], os.path.dirname(values["$ref"]))
-
-        return values
-
-
-class LazyModelParser(Generic[ModelT]):
-    @classmethod
-    def lazy_load(cls, ref: str, model_clazz: ModelT, base: str) -> Union[ModelT, LazyModel]:
-        with open(f"{base}/{ref}") as f:
-            data = json.load(f)
-
-        data.update({"$ref": ref, "$base": str(base)})
-
-        lazy_model = create_model(model_clazz.__name__, __base__=(model_clazz, LazyModel))
-
-        model = parse_obj_as(lazy_model, data)
-
-        return model
-
-
-class LazyDict(GenericModel, Generic[KeyT, ValueT], UserDict):
-    __root__: Union[LazyModel, Dict[KeyT, ValueT]]
-
-    __subject__: Dict[KeyT, ValueT] = PrivateAttr(default=None)
-
-    @property
-    def data(self) -> Dict[KeyT, ValueT]:
-
-        if not isinstance(self.__root__, LazyModel):
-            return self.__root__
-
-        if self.__subject__ is not None:
-            # The lazy-loading has been done.
-            return self.__subject__
-
-        key_clazz = GenericModelDetails[type(self)][KeyT]
-        value_clazz = GenericModelDetails[type(self)][ValueT]
-
-        path = os.path.join(self.__root__.lazy_bass, self.__root__.lazy_ref)
-        with open(path) as f:
-            data = json.load(f)
-
-        for key, value in data.items():
-            if "$ref" not in value:
-                # This element is not a lazy model.
-                continue
-
-            # Provide $base so that we can load the next layer.
-            value["$base"] = os.path.dirname(path)
-
-        self.__subject__ = parse_obj_as(Dict[key_clazz, Union[LazyModel, value_clazz]], data)
-
-        return self.__subject__
-
-    @data.setter
-    def data(self, value):
-        raise Exception("blarg")
-
-
-class BaseModel(PydanticBaseModel):
-    pass
-
-
-class CastMember(BaseModel):
+class CastMember(PydanticBaseModel):
     actor: str
     name: str
 
 
-class Film(BaseModel):
+class Film(PydanticBaseModel):
     __root__: List[Any]
 
+    # https://docs.pydantic.dev/usage/models/#custom-root-types
 
-class Hobby(BaseModel):
+    def __iter__(self):
+        return iter(self.__root__)
+
+    def __getitem__(self, item):
+        return self.__root__[item]
+
+
+class Hobby(PydanticBaseModel):
     name: str
 
 
-class Movie(BaseModel):
+class Movie(PydanticBaseModel):
     budget: int = 0
     run_time_minutes: int = 0
     title: str
@@ -115,24 +35,38 @@ class Movie(BaseModel):
     cast: LazyDict[str, CastMember] = Field(default_factory=dict)
 
 
-class Spouse(BaseModel):
+class Spouse(PydanticBaseModel):
     first_name: str
     last_name: str
-    children: List[str] = Field(default_factory=list)
+    children: LazyList[str] = Field(default_factory=list)
 
 
-class Actor(BaseModel):
+class Actor(PydanticBaseModel):
     birth_year: int = 0
     first_name: str
     last_name: str
     is_funny: bool = False
 
-    filmography: List[Film] = Field(default_factory=list)
-    movies: Union[LazyDict[str, Movie], List[Movie]]
+    filmography: LazyList[Film] = Field(default_factory=list)
+    movies: Union[LazyDict[str, Movie], LazyList[Movie]]
 
     hobbies: LazyDict[str, Hobby] = Field(default_factory=dict)
     spouses: LazyDict[str, Spouse] = Field(default_factory=dict)
 
 
-class Model(BaseModel):
+class Model(PydanticBaseModel, LazyParserMixin):
+    # LazyParserMixin.parse_lazy() will inject LazyBaseModel as a superclass.
+    # No fields are added and regular pydantic mechanisms can be used to
+    # create instances of Model.
+    # Use this approach if your input data might or might not be lazy-loadable.
+
+    actors: LazyDict[str, Actor]
+
+
+class LazyModel(LazyBaseModel):
+    # LazyBaseModel adds required lazy-loading fields.
+    # LazyParserMixin.parse_lazy() will set these, or they can be provided to
+    # normal pydantic instantiation mechanisms just like other fields.
+    # Use this approach if your input data is lazy-loadable.
+
     actors: LazyDict[str, Actor]
