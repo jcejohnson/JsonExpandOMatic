@@ -4,6 +4,9 @@
 
 self=$(basename $0)
 
+# This supposedly makes pip faster in WSL.
+export DISPLAY=
+
 if [ ! -d venv ] ; then
   (
     set -x
