@@ -1,0 +1,56 @@
+#
+# See also:
+# - https://dev.to/arnu515/create-a-pypi-pip-package-test-it-and-publish-it-using-github-actions-part-2-1o83
+# - https://docs.github.com/en/actions/guides/building-and-testing-python
+# - https://docs.github.com/en/github/administering-a-repository/managing-releases-in-a-repository
+# - https://github.com/pypa/sampleproject
+# - https://packaging.python.org/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
+#
+
+name: Test
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow when a release is created
+  release:
+    types:
+      - created
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    name: Build and test
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-22.04
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # Sets up python3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      # Creates venv upgrades pip, installs dependencies, etc. exactly as we do for development.
+      - name: setup
+        run: |
+          ./wrapper.sh
+          ./expand.sh --version
+
+      - name: test
+        run: |
+          ./tox.sh
+
+      # Build a binary wheel and a source tarball
+      - name: build
+        run: |
+          python3 -m pip install build --user
+          python3 -m build --sdist --wheel --outdir dist/ .
