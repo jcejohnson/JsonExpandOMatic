@@ -4,6 +4,7 @@ import os
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
+from json_expand_o_matic.expander import ExpansionPool
 
 
 class TestLeaves:
@@ -27,6 +28,23 @@ class TestLeaves:
     @pytest.fixture
     def original_data(self, raw_data):
         return json.loads(json.dumps(raw_data))
+
+    def setup_method(self, method):
+        """setup any state tied to the execution of the given method in a
+        class.  setup_method is invoked for every test method of a class.
+        """
+
+        if os.environ.get("EXPAND_USING_THREAD_POOL"):
+            ExpansionPool.create_singleton()
+
+
+    def teardown_method(self, method):
+        """teardown any state that was previously setup with a setup_method
+        call.
+        """
+
+        if os.environ.get("EXPAND_USING_THREAD_POOL"):
+            ExpansionPool.destroy_singleton()
 
     def test_actors1(self, tmpdir, test_data, original_data):
         """Verify that we can create a json file for each actor and not recurse any further."""

@@ -2,9 +2,41 @@ import collections
 import hashlib
 import json
 import os
+from multiprocessing.pool import ThreadPool
 
 from .leaf_node import LeafNode
 
+class ExpansionPool:
+
+    INSTANCE = None
+
+    def __init__(self):
+        self._pool = None
+        self._results = list()
+
+    @classmethod
+    def create_singleton(cls):
+        cls.INSTANCE = cls()
+        return cls.INSTANCE
+
+    @classmethod
+    def destroy_singleton(cls):
+        cls.INSTANCE = None
+
+    def execute(self, callable):
+        with ThreadPool() as self._pool:
+            result = callable()
+            # close the pool
+            self._pool.close()
+            # wait for all tasks to complete
+            self._pool.join()
+        self._pool = None
+        return result
+
+    def invoke(self, task):
+        result = self._pool.apply_async(task)
+        self._results.append(result)
+        return result
 
 class Expander:
     """Expand a dict or list into one or more json files."""
@@ -120,7 +152,10 @@ class Expander:
         # This will save a surprising amount of space in large files.
         dumps = json.dumps(self.data, indent="\t", sort_keys=True)
 
-        self._json_save(directory, filename, dumps)
+        if ExpansionPool.INSTANCE:
+            ExpansionPool.INSTANCE.invoke(lambda : self._json_save(directory, filename, dumps))
+        else:
+            self._json_save(directory, filename, dumps)
 
         checksum = self._hash_function(dumps)
         if checksum:

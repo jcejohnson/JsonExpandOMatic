@@ -48,7 +48,7 @@ class JsonExpandOMatic:
         if preserve:
             data = json.loads(json.dumps(data))
 
-        from .expander import Expander
+        from .expander import Expander, ExpansionPool
 
         expander = Expander(
             logger=self.logger,
@@ -57,7 +57,10 @@ class JsonExpandOMatic:
             leaf_nodes=LeafNode.construct(leaf_nodes),
             **expander_options,
         )
-        result = expander.execute()
+        if ExpansionPool.INSTANCE:
+            result = ExpansionPool.INSTANCE.execute(expander.execute)
+        else:
+            result = expander.execute()
         self.hashcodes = expander.hashcodes
 
         return result
