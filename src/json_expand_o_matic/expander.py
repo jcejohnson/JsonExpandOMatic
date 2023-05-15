@@ -2,48 +2,18 @@ import collections
 import hashlib
 import json
 import os
-from multiprocessing.pool import ThreadPool
+from functools import partial
 
+from .expansion_pool import ExpansionPool
 from .leaf_node import LeafNode
 
-class ExpansionPool:
-
-    INSTANCE = None
-
-    def __init__(self):
-        self._pool = None
-        self._results = list()
-
-    @classmethod
-    def create_singleton(cls):
-        cls.INSTANCE = cls()
-        return cls.INSTANCE
-
-    @classmethod
-    def destroy_singleton(cls):
-        cls.INSTANCE = None
-
-    def execute(self, callable):
-        with ThreadPool() as self._pool:
-            result = callable()
-            # close the pool
-            self._pool.close()
-            # wait for all tasks to complete
-            self._pool.join()
-        self._pool = None
-        return result
-
-    def invoke(self, task):
-        result = self._pool.apply_async(task)
-        self._results.append(result)
-        return result
 
 class Expander:
     """Expand a dict or list into one or more json files."""
 
     HASH_MD5 = "HASH_MD5"
 
-    def __init__(self, *, logger, path, data, leaf_nodes, **options):
+    def __init__(self, *, logger, path, data, leaf_nodes, expansion_pool=None, **options):
         assert isinstance(data, dict) or isinstance(data, list)
 
         self.logger = logger
@@ -51,9 +21,20 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
-        self.ref_key = options.get("ref_key", "$ref")
+        self.expansion_pool = expansion_pool
+        if self.expansion_pool:
+            # If we are given a pool, replace self._json_save with a wrapper that will
+            # cause the save to be invoked in the pool.
+            save_function = self._json_save
+            self._json_save = lambda directory, filename, dumps: self.expansion_pool.invoke(
+                partial(save_function, directory, filename, dumps)
+            )
 
-        self.hash_mode = options.get("hash_mode", None)
+        self.options = options if options is not None else dict()
+
+        self.ref_key = self.options.get("ref_key", "$ref")
+
+        self.hash_mode = self.options.get("hash_mode", None)
         if self.hash_mode == Expander.HASH_MD5:
             self._hash_function = self._hash_md5
         else:
@@ -145,17 +126,16 @@ class Expander:
         if leaf_node and not leaf_node.WHAT == LeafNode.What.DUMP:
             return True
 
-        directory = os.path.dirname(self.path)
-        filename = f"{self.path}.json"
+        directory: str = os.path.dirname(self.path)
+        filename: str = f"{self.path}.json"
+        assert isinstance(directory, str)
+        assert isinstance(filename, str)
 
         # Use tabs for indents.
         # This will save a surprising amount of space in large files.
         dumps = json.dumps(self.data, indent="\t", sort_keys=True)
 
-        if ExpansionPool.INSTANCE:
-            ExpansionPool.INSTANCE.invoke(lambda : self._json_save(directory, filename, dumps))
-        else:
-            self._json_save(directory, filename, dumps)
+        self._json_save(directory, filename, dumps)
 
         checksum = self._hash_function(dumps)
         if checksum:
@@ -194,8 +174,7 @@ class Expander:
                 return self._dump(c)
 
             self._log(f">>> Expand children of [{c.raw}]")
-            Expander(
-                logger=self.logger,
+            self._recursion_instance(
                 path=os.path.dirname(self.path),
                 data={os.path.basename(self.path): self.data},
                 leaf_nodes=c.children,
@@ -215,12 +194,25 @@ class Expander:
             with open(filename, "w") as f:
                 f.write(dumps)
         except FileNotFoundError:
-            os.makedirs(directory)
+            os.makedirs(directory, exist_ok=True)
             with open(filename, "w") as f:
                 f.write(dumps)
 
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
+
+    def _recursion_instance(self, *, path, data, leaf_nodes):
+        instance = Expander(
+            expansion_pool=self.expansion_pool,
+            logger=self.logger,
+            #
+            data=data,
+            leaf_nodes=leaf_nodes,
+            path=path,
+            #
+            **self.options,
+        )
+        return instance
 
     def _recursively_expand(self, *, key):
         if not (isinstance(self.data[key], dict) or isinstance(self.data[key], list)):
@@ -228,12 +220,10 @@ class Expander:
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        expander = Expander(
-            logger=self.logger,
+        expander = self._recursion_instance(
             path=os.path.join(self.path, path_component),
             data=self.data[key],
             leaf_nodes=self.leaf_nodes,
-            hash_mode=self.hash_mode,
         )
         self.data[key] = expander._execute(
             indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}"

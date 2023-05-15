@@ -18,7 +18,7 @@ class JsonExpandOMatic:
         self.path = os.path.abspath(path)
         self.logger = logger
 
-    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], **expander_options):
+    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], threaded=False, **expander_options):
         """Expand a dict into a collection of subdirectories and json files.
 
         Creates:
@@ -48,17 +48,25 @@ class JsonExpandOMatic:
         if preserve:
             data = json.loads(json.dumps(data))
 
-        from .expander import Expander, ExpansionPool
+        from .expander import Expander
+
+        if threaded:
+            from .expansion_pool import ExpansionPool
+
+            expansion_pool = ExpansionPool()
+        else:
+            expansion_pool = None
 
         expander = Expander(
             logger=self.logger,
             path=self.path,
             data={root_element: data},
             leaf_nodes=LeafNode.construct(leaf_nodes),
+            expansion_pool=expansion_pool,
             **expander_options,
         )
-        if ExpansionPool.INSTANCE:
-            result = ExpansionPool.INSTANCE.execute(expander.execute)
+        if threaded:
+            result = expansion_pool.execute(expander.execute)
         else:
             result = expander.execute()
         self.hashcodes = expander.hashcodes

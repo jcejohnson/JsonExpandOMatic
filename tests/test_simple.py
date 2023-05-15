@@ -21,6 +21,10 @@ class TestSimple:
 
     # Fixtures to provide copies of the raw data to each test function.
 
+    @pytest.fixture(params=[False, True])
+    def threaded(self, request):
+        return request.param
+
     @pytest.fixture
     def test_data(self, raw_data):
         return json.loads(json.dumps(raw_data))
@@ -33,8 +37,10 @@ class TestSimple:
         # Assert that independent copies of the raw data are equivalent.
         assert test_data == original_data
 
-    def test_expand_preserve(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=True)
+    def test_expand_preserve(self, tmpdir, test_data, original_data, threaded):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data, root_element="root", preserve=True, threaded=threaded
+        )
 
         # preserve=True prevents mangling of test_data by expand()
         assert test_data == original_data
@@ -42,8 +48,10 @@ class TestSimple:
         # expand() returns a new representation of `data`
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
-    def test_expand_mangle(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
+    def test_expand_mangle(self, tmpdir, test_data, original_data, threaded):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data, root_element="root", preserve=False, threaded=threaded
+        )
 
         # preserve=True allows mangling of test_data by expand()
         assert test_data != original_data
@@ -55,8 +63,8 @@ class TestSimple:
         # expand() returns a new representation of `data`
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
-    def test_file_exixtence(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root")
+    def test_file_exixtence(self, tmpdir, test_data, original_data, threaded):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", threaded=threaded)
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         # This is the wrapper around the original data
@@ -90,8 +98,10 @@ class TestSimple:
         # I'm not going to go any deeper. You get the idea...
         # See `test_leaves.py` for some more interesting things about the files.
 
-    def test_contract(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
+    def test_contract(self, tmpdir, test_data, original_data, threaded):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data, root_element="root", preserve=False, threaded=threaded
+        )
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         # We can use JsonExpandOMatic() to load the expanded data from the filesystem.
@@ -103,8 +113,10 @@ class TestSimple:
         with open(f"{tmpdir}/root.json") as f:
             assert jsonref.load(f, base_uri=f"file://{tmpdir}/") == original_data
 
-    def test_jsonref(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
+    def test_jsonref(self, tmpdir, test_data, original_data, threaded):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data, root_element="root", preserve=False, threaded=threaded
+        )
 
         # We can use jsonref to load this new representation.
         # Note that loading in this way exposes the wrapping element `root`.
