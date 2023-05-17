@@ -4,7 +4,6 @@ import json
 import os
 from functools import partial
 
-from .expansion_pool import ExpansionPool
 from .leaf_node import LeafNode
 
 
@@ -26,8 +25,8 @@ class Expander:
             # If we are given a pool, replace self._json_save with a wrapper that will
             # cause the save to be invoked in the pool.
             save_function = self._json_save
-            self._json_save = lambda directory, filename, dumps: self.expansion_pool.invoke(
-                partial(save_function, directory, filename, dumps)
+            self._json_save = lambda directory, filename, checksum, checksum_file, dumps: self.expansion_pool.invoke(
+                partial(save_function, directory, filename, checksum, checksum_file, dumps)
             )
 
         self.options = options if options is not None else dict()
@@ -135,9 +134,10 @@ class Expander:
         # This will save a surprising amount of space in large files.
         dumps = json.dumps(self.data, indent="\t", sort_keys=True)
 
-        self._json_save(directory, filename, dumps)
+        checksum, checksum_file = self._hash_function(dumps)
 
-        checksum = self._hash_function(dumps)
+        self._json_save(directory, filename, checksum, checksum_file, dumps)
+
         if checksum:
             self.hashcodes[checksum].append(filename)
 
@@ -160,10 +160,7 @@ class Expander:
         Returns checksum.
         """
         checksum = hashlib.md5(dumps.encode()).hexdigest()
-        filename = f"{self.path}.md5"
-        with open(filename, "w") as f:
-            f.write(checksum)
-        return checksum
+        return checksum, f"{self.path}.md5"
 
     def _is_leaf_node(self, when):
         for c in self.leaf_nodes:
@@ -185,7 +182,9 @@ class Expander:
 
         return False
 
-    def _json_save(self, directory, filename, dumps):
+    def _json_save(self, directory, filename, checksum, checksum_file, dumps):
+        return
+
         try:
             # Assume that the path will already exist.
             # We'll take a hit on the first file in each new path but save the overhead
@@ -193,10 +192,16 @@ class Expander:
             # have multiple nested objects.
             with open(filename, "w") as f:
                 f.write(dumps)
+            with open(checksum_file, "w") as f:
+                f.write(checksum)
+
         except FileNotFoundError:
             os.makedirs(directory, exist_ok=True)
             with open(filename, "w") as f:
                 f.write(dumps)
+            with open(checksum_file, "w") as f:
+                f.write(checksum)
+
 
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)

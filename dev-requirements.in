@@ -1,6 +1,5 @@
 bump2version
 coloredlogs
-tox
 pytest
 pytest-cov
 pytest-resource-path

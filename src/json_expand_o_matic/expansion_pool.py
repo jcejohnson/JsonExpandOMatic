@@ -1,5 +1,5 @@
 import logging
-from multiprocessing.pool import ThreadPool
+from multiprocessing.pool import AsyncResult, ThreadPool
 from queue import Queue
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,8 @@ class ExpansionPool:
             result = callable()
 
             while not self._results.empty():
-                self._results.get().wait()
+                result: AsyncResult = self._results.get()
+                result.wait(.01)
 
             # close the pool
             self._pool.close()
