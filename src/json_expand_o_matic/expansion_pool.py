@@ -1,7 +1,8 @@
-import os
-import logging
 import concurrent.futures
+import logging
+import os
 from queue import Queue
+from time import sleep
 from typing import Callable, List
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ class ExpansionPool:
         self.queue = Queue()
 
     @classmethod
-    def create_singleton(cls, auto_destroy: bool=True):
+    def create_singleton(cls, auto_destroy: bool = True):
         cls.INSTANCE = cls()
         cls._auto_destroy = auto_destroy
         return cls.INSTANCE
@@ -28,27 +29,29 @@ class ExpansionPool:
     def destroy_singleton(cls):
         cls.INSTANCE = None
 
-    def execute(self, callable: Callable):
-        self.pool_size = int(os.cpu_count/2+1)
+    def execute(self, main: Callable):
+        self.pool_size = int(os.cpu_count() / 2 + 1)
+        handler_results = list()
+        handler_futures = list()
         with concurrent.futures.ProcessPoolExecutor(self.pool_size) as self._pool:
-            result = callable()
+            # Something could add to the queue before calling execute()
 
-            while not self._futures.empty():
-                print(self._futures.qsize())
+            # The entry point may add to the queue.
+            main_result = main()
 
-                futures = list()
-                while not self._futures.empty():
-                    futures.append(self._futures.get())
+            # This outer loop is in case the handlers add things to the queue.
+            while not self.queue.empty():
+                print(f"Queue size: {self.queue.qsize()}")
 
-                print(len(futures))
+                # Iterate through whatever is in the queue and work to the pool.
+                while not self.queue.empty():
+                    handler, args, kwargs = self.queue.get()
+                    handler_future = self._pool.submit(handler, *args, **kwargs)
+                    handler_futures.append(handler_future)
 
-                for result in concurrent.futures.as_completed(futures):
-                    self._results.append(result.result())
-                    # print(len(self._results), end=" ")
-                # print("")
-
-                # result: concurrent.futures.Future = self._futures.get()
-                # self._results.put(result)
+                # Wait for this batch to complete.
+                for handler_result in concurrent.futures.as_completed(handler_futures):
+                    handler_results.append(handler_result.result())
 
             print("Queue is empty")
 
@@ -57,7 +60,7 @@ class ExpansionPool:
         if self.__class__.INSTANCE and self is self.__class__.INSTANCE and self._auto_destroy:
             self.destroy_singleton()
 
-        return result
+        return main_result, handler_results
 
     def invoke(self, task: Callable, *args, **kwargs) -> concurrent.futures.Future:
         future: concurrent.futures.Future = self._pool.submit(task, *args, **kwargs)

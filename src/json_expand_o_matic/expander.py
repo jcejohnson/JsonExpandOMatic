@@ -1,17 +1,19 @@
-import concurrent.futures
+import asyncio
 import collections
+import concurrent.futures
 import hashlib
 import json
 import os
-from functools import partial
+import threading
 from asyncio import sleep
+from functools import partial
 from queue import Queue
-from .leaf_node import LeafNode
 
 from aiofile import async_open
-import asyncio
+
 from .expansion_pool import ExpansionPool
-import threading
+from .leaf_node import LeafNode
+
 
 def _write_file(directory, filename, data):
     try:
@@ -25,6 +27,7 @@ def _write_file(directory, filename, data):
         os.makedirs(directory, exist_ok=True)
         with open(filename, "w") as f:
             f.write(data)
+
 
 class Expander:
     """Expand a dict or list into one or more json files."""
@@ -45,6 +48,10 @@ class Expander:
 
         self.ref_key = self.options.get("ref_key", "$ref")
 
+        self.json_dump_kwargs = self.options.get(
+            "json_dump_kwargs", {"indent": None, "sort_keys": False, "separators": (",", ":")}
+        )
+
         self.hash_mode = self.options.get("hash_mode", None)
         if self.hash_mode == Expander.HASH_MD5:
             self._hash_function = self._hash_md5
@@ -60,44 +67,24 @@ class Expander:
     def execute(self):
         """Expand self.data into one or more json files."""
 
-        self._dump = lambda *args : None
+        self._dump = lambda *args: None
 
-        pool_size = int(os.cpu_count()/2+1)
-        print(f"Pool size is {pool_size}")
-        with concurrent.futures.ProcessPoolExecutor(pool_size) as pool:
-            self.queue = pool.queue
+        pool = ExpansionPool()
+        self.queue = pool.queue
 
-            print("Begin Work")
+        def main():
+            print("_execute Begins")
             expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
-            print(self.queue.qsize())
+            print("_execute Complete")
+            return expansion
 
-            while not self.queue.empty():
-                directory, filename, checksum, checksum_file, dumps = self.queue.get()
-                pool.submit(_write_file, directory, filename, checksum, checksum_file, dumps)
+        expansion, _ = pool.execute(main)
 
         print("Hashcode Cleanup")
         self._hashcodes_cleanup()
 
         print("Work Complete")
         return expansion
-
-    async def _json_save(self, directory, filename, checksum, checksum_file, dumps):
-        try:
-            # Assume that the path will already exist.
-            # We'll take a hit on the first file in each new path but save the overhead
-            # of checking on each subsequent one. This assumes that most objects will
-            # have multiple nested objects.
-            async with async_open(filename, "w") as f:
-                await f.write(dumps)
-            async with async_open(checksum_file, "w") as f:
-                await f.write(checksum)
-
-        except FileNotFoundError:
-            os.makedirs(directory, exist_ok=True)
-            async with async_open(filename, "w") as f:
-                await f.write(dumps)
-            async with async_open(checksum_file, "w") as f:
-                await f.write(checksum)
 
     def _execute(self, traversal, indent, my_path_component):
         """Main...
@@ -173,13 +160,13 @@ class Expander:
         assert isinstance(directory, str)
         assert isinstance(data_file, str)
 
-        dumps = json.dumps(self.data, indent="", sort_keys=False)
-        self.queue.put((directory, data_file, dumps))
+        dumps = json.dumps(self.data, **self.json_dump_kwargs)
+        self.queue.put((_write_file, (directory, data_file, dumps), {}))
 
         checksum, file_suffix = self._hash_function(dumps)
         if checksum:
             md5_file: str = f"{self.path}.{file_suffix}"
-            self.queue.put((directory, md5_file, checksum))
+            self.queue.put((_write_file, (directory, md5_file, checksum), {}))
             self.hashcodes[checksum].append(data_file)
 
         # Build a reference to the file we just wrote.
