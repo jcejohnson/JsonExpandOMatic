@@ -18,7 +18,7 @@ class JsonExpandOMatic:
         self.path = os.path.abspath(path)
         self.logger = logger
 
-    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], threaded=False, **expander_options):
+    def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], **expander_options):
         """Expand a dict into a collection of subdirectories and json files.
 
         Creates:

@@ -3,7 +3,6 @@ import hashlib
 import json
 import os
 
-
 from .expansion_pool import ExpansionPool
 from .leaf_node import LeafNode
 
@@ -24,6 +23,9 @@ class Expander:
         self.work = None
 
         self.options = options if options is not None else dict()
+        self.pool_options = {
+            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("pool_")}
+        }
 
         self.ref_key = self.options.get("ref_key", "$ref")
 
@@ -49,7 +51,7 @@ class Expander:
         # Replace the _dump() method with a no-op for the root of the data.
         self._dump = lambda *args: None
 
-        pool = ExpansionPool(logger=self.logger)
+        pool = ExpansionPool(logger=self.logger, **self.pool_options)
         self.work = pool.work
 
         expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
@@ -137,14 +139,11 @@ class Expander:
         checksum, checksumfile_suffix = self._hash_function(dumps)
         checksum_file = f"{filename}.{checksumfile_suffix}"
 
-        self.work.append((directory, data_file, dumps))
-
         if checksum:
-            # self.work.append((directory, data_file, dumps, md5_file, checksum))
-            self.work.append((directory, checksum_file, checksum))
+            self.work.append((directory, data_file, dumps, checksum_file, checksum))
             self.hashcodes[checksum].append(data_file)
-        # else:
-        #     self.work.append((directory, data_file, dumps, None, None))
+        else:
+            self.work.append((directory, data_file, dumps, None, None))
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
@@ -200,7 +199,7 @@ class Expander:
             #
             **self.options,
         )
-        instance.work=self.work
+        instance.work = self.work
         return instance
 
     def _recursively_expand(self, *, key):
