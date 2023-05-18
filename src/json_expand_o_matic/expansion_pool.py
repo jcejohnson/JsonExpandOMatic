@@ -1,17 +1,31 @@
 import concurrent.futures
 import logging
 import os
-from queue import Queue
-from time import sleep
-from typing import Callable, List
+from multiprocessing import Queue as Queue
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
 
-class ExpansionPool:
-    INSTANCE: "ExpansionPool" = None
+def _write_file(request):
+    directory, filename, data = [r for r in request]
+    try:
+        # Assume that the path will already exist.
+        # We'll take a hit on the first file in each new path but save the overhead
+        # of checking on each subsequent one. This assumes that most objects will
+        # have multiple nested objects.
+        with open(filename, "w") as f:
+            f.write(data)
+    except FileNotFoundError:
+        os.makedirs(directory, exist_ok=True)
+        with open(filename, "w") as f:
+            f.write(data)
 
-    def __init__(self):
+
+class ExpansionPool:
+    def __init__(self, *, logger):
+        self.logger = logger
+
         self._pool: concurrent.futures.Executor = None
         self._futures: Queue = Queue()
         self._results = list()
@@ -19,18 +33,8 @@ class ExpansionPool:
         self.pool_size: int = None
         self.queue = Queue()
 
-    @classmethod
-    def create_singleton(cls, auto_destroy: bool = True):
-        cls.INSTANCE = cls()
-        cls._auto_destroy = auto_destroy
-        return cls.INSTANCE
-
-    @classmethod
-    def destroy_singleton(cls):
-        cls.INSTANCE = None
-
     def execute(self, main: Callable):
-        self.pool_size = int(os.cpu_count() / 2 + 1)
+        self.pool_size = int(os.cpu_count() * 0.8) or 1
         handler_results = list()
         handler_futures = list()
         with concurrent.futures.ProcessPoolExecutor(self.pool_size) as self._pool:
@@ -40,29 +44,28 @@ class ExpansionPool:
             main_result = main()
 
             # This outer loop is in case the handlers add things to the queue.
-            while not self.queue.empty():
-                print(f"Queue size: {self.queue.qsize()}")
+            while self.queue.qsize():
+                queue_size = self.queue.qsize()
 
-                # Iterate through whatever is in the queue and work to the pool.
-                while not self.queue.empty():
-                    handler, args, kwargs = self.queue.get()
-                    handler_future = self._pool.submit(handler, *args, **kwargs)
-                    handler_futures.append(handler_future)
+                self.logger.debug(f"Queue size: {queue_size}")
 
-                # Wait for this batch to complete.
-                for handler_result in concurrent.futures.as_completed(handler_futures):
-                    handler_results.append(handler_result.result())
+                self.logger.debug("Gathering work")
+                work = list()
+                while self.queue.qsize():  # while len(work) < queue_size:
+                    args = self.queue.get()
+                    work.append(args)
+                self.logger.debug(f"Work size : {len(work)}")
 
-            print("Queue is empty")
+                chunksize = 1 + int(len(work) / self.pool_size)
+                self.logger.debug(f"Submitting work with chunksize {chunksize}")
+                handler_futures = self._pool.map(_write_file, work, chunksize=chunksize)
+
+                self.logger.debug("Gathering results")
+                for handler_result in handler_futures:
+                    handler_results.append(handler_result)
+
+            self.logger.debug("Queue is empty")
 
         self._pool = None
 
-        if self.__class__.INSTANCE and self is self.__class__.INSTANCE and self._auto_destroy:
-            self.destroy_singleton()
-
         return main_result, handler_results
-
-    def invoke(self, task: Callable, *args, **kwargs) -> concurrent.futures.Future:
-        future: concurrent.futures.Future = self._pool.submit(task, *args, **kwargs)
-        self._futures.put(future)
-        return future

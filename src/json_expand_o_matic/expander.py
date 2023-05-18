@@ -1,32 +1,11 @@
-import asyncio
 import collections
-import concurrent.futures
 import hashlib
 import json
 import os
-import threading
-from asyncio import sleep
-from functools import partial
-from queue import Queue
 
-from aiofile import async_open
 
 from .expansion_pool import ExpansionPool
 from .leaf_node import LeafNode
-
-
-def _write_file(directory, filename, data):
-    try:
-        # Assume that the path will already exist.
-        # We'll take a hit on the first file in each new path but save the overhead
-        # of checking on each subsequent one. This assumes that most objects will
-        # have multiple nested objects.
-        with open(filename, "w") as f:
-            f.write(data)
-    except FileNotFoundError:
-        os.makedirs(directory, exist_ok=True)
-        with open(filename, "w") as f:
-            f.write(data)
 
 
 class Expander:
@@ -67,23 +46,18 @@ class Expander:
     def execute(self):
         """Expand self.data into one or more json files."""
 
+        # Replace the _dump() method with a no-op for the root of the data.
         self._dump = lambda *args: None
 
-        pool = ExpansionPool()
+        pool = ExpansionPool(logger=self.logger)
         self.queue = pool.queue
 
-        def main():
-            print("_execute Begins")
-            expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
-            print("_execute Complete")
-            return expansion
+        main = lambda: self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
 
         expansion, _ = pool.execute(main)
 
-        print("Hashcode Cleanup")
         self._hashcodes_cleanup()
 
-        print("Work Complete")
         return expansion
 
     def _execute(self, traversal, indent, my_path_component):
@@ -161,12 +135,12 @@ class Expander:
         assert isinstance(data_file, str)
 
         dumps = json.dumps(self.data, **self.json_dump_kwargs)
-        self.queue.put((_write_file, (directory, data_file, dumps), {}))
+        self.queue.put((directory, data_file, dumps))
 
         checksum, file_suffix = self._hash_function(dumps)
         if checksum:
             md5_file: str = f"{self.path}.{file_suffix}"
-            self.queue.put((_write_file, (directory, md5_file, checksum), {}))
+            self.queue.put((directory, md5_file, checksum))
             self.hashcodes[checksum].append(data_file)
 
         # Build a reference to the file we just wrote.
