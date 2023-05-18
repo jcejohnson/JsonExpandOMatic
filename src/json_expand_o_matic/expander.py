@@ -13,7 +13,7 @@ class Expander:
 
     HASH_MD5 = "HASH_MD5"
 
-    def __init__(self, *, logger, path, data, leaf_nodes, queue=None, **options):
+    def __init__(self, *, logger, path, data, leaf_nodes, **options):
         assert isinstance(data, dict) or isinstance(data, list)
 
         self.logger = logger
@@ -21,7 +21,7 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
-        self.queue = queue
+        self.work = None
 
         self.options = options if options is not None else dict()
 
@@ -50,11 +50,11 @@ class Expander:
         self._dump = lambda *args: None
 
         pool = ExpansionPool(logger=self.logger)
-        self.queue = pool.queue
+        self.work = pool.work
 
-        main = lambda: self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+        expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
 
-        expansion, _ = pool.execute(main)
+        pool.drain()
 
         self._hashcodes_cleanup()
 
@@ -129,19 +129,21 @@ class Expander:
             return True
 
         directory: str = os.path.dirname(self.path)
-        data_file: str = f"{self.path}.json"
+        data_file: str = f"{os.path.basename(self.path)}.json"
 
         assert isinstance(directory, str)
         assert isinstance(data_file, str)
 
         dumps = json.dumps(self.data, **self.json_dump_kwargs)
-        self.queue.put((directory, data_file, dumps))
+        self.work.append((directory, data_file, dumps))
 
         checksum, file_suffix = self._hash_function(dumps)
         if checksum:
             md5_file: str = f"{self.path}.{file_suffix}"
-            self.queue.put((directory, md5_file, checksum))
+            self.work.append((directory, data_file, dumps, md5_file, checksum))
             self.hashcodes[checksum].append(data_file)
+        else:
+            self.work.append((directory, data_file, dumps, None, None))
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
@@ -190,7 +192,7 @@ class Expander:
     def _recursion_instance(self, *, path, data, leaf_nodes):
         instance = Expander(
             logger=self.logger,
-            queue=self.queue,
+            work=self.work,
             #
             data=data,
             leaf_nodes=leaf_nodes,
