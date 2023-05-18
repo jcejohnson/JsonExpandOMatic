@@ -64,7 +64,7 @@ def expand(logger, output_path, input_file, *leaf_nodes_input):
         preserve=False,
         leaf_nodes=leaf_nodes,
         hash_mode=Expander.HASH_MD5,
-        threaded=True,
+        threaded=False,
         # leaf_nodes=["/.*"]
         # leaf_nodes=["/root/actors/.*/movies/.*"]
         # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]

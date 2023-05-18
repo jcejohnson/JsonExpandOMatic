@@ -1,20 +1,22 @@
 import logging
-from multiprocessing.pool import AsyncResult, ThreadPool
+import concurrent.futures
 from queue import Queue
+from typing import Callable, List
 
 logger = logging.getLogger(__name__)
 
 
 class ExpansionPool:
-    INSTANCE = None
+    INSTANCE: "ExpansionPool" = None
 
     def __init__(self):
-        self._pool = None
-        self._results = Queue()
-        self._auto_destroy = True
+        self._pool: concurrent.futures.Executor = None
+        self._futures: Queue = Queue()
+        self._results = list()
+        self._auto_destroy: bool = True
 
     @classmethod
-    def create_singleton(cls, auto_destroy=True):
+    def create_singleton(cls, auto_destroy: bool=True):
         cls.INSTANCE = cls()
         cls._auto_destroy = auto_destroy
         return cls.INSTANCE
@@ -23,18 +25,28 @@ class ExpansionPool:
     def destroy_singleton(cls):
         cls.INSTANCE = None
 
-    def execute(self, callable):
-        with ThreadPool() as self._pool:
+    def execute(self, callable: Callable):
+        with concurrent.futures.ThreadPoolExecutor() as self._pool:
             result = callable()
 
-            while not self._results.empty():
-                result: AsyncResult = self._results.get()
-                result.wait(.01)
+            while not self._futures.empty():
+                print(self._futures.qsize())
 
-            # close the pool
-            self._pool.close()
-            # wait for all tasks to complete
-            self._pool.join()
+                futures = list()
+                while not self._futures.empty():
+                    futures.append(self._futures.get())
+
+                print(len(futures))
+
+                for result in concurrent.futures.as_completed(futures):
+                    self._results.append(result.result())
+                    # print(len(self._results), end=" ")
+                # print("")
+
+                # result: concurrent.futures.Future = self._futures.get()
+                # self._results.put(result)
+
+            print("Queue is empty")
 
         self._pool = None
 
@@ -43,7 +55,7 @@ class ExpansionPool:
 
         return result
 
-    def invoke(self, task):
-        result = self._pool.apply_async(task)
-        self._results.put(result)
-        return result
+    def invoke(self, task: Callable, *args, **kwargs) -> concurrent.futures.Future:
+        future: concurrent.futures.Future = self._pool.submit(task, *args, **kwargs)
+        self._futures.put(future)
+        return future

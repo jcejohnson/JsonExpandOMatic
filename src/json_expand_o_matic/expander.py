@@ -3,16 +3,21 @@ import hashlib
 import json
 import os
 from functools import partial
-
+from asyncio import sleep
+from queue import Queue
 from .leaf_node import LeafNode
 
+from aiofile import async_open
+import asyncio
+
+import threading
 
 class Expander:
     """Expand a dict or list into one or more json files."""
 
     HASH_MD5 = "HASH_MD5"
 
-    def __init__(self, *, logger, path, data, leaf_nodes, expansion_pool=None, **options):
+    def __init__(self, *, logger, path, data, leaf_nodes, queue=None, **options):
         assert isinstance(data, dict) or isinstance(data, list)
 
         self.logger = logger
@@ -20,14 +25,7 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
-        self.expansion_pool = expansion_pool
-        if self.expansion_pool:
-            # If we are given a pool, replace self._json_save with a wrapper that will
-            # cause the save to be invoked in the pool.
-            save_function = self._json_save
-            self._json_save = lambda directory, filename, checksum, checksum_file, dumps: self.expansion_pool.invoke(
-                partial(save_function, directory, filename, checksum, checksum_file, dumps)
-            )
+        self.queue = queue or Queue()
 
         self.options = options if options is not None else dict()
 
@@ -48,14 +46,42 @@ class Expander:
     def execute(self):
         """Expand self.data into one or more json files."""
 
-        # Replace the _dump() method with a no-op for the root of the data.
-        self._dump = lambda *args: None
+        self._dump = lambda *args : None
 
+        print("Work Work")
         expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+        print(self.queue.qsize())
 
+        async def consume():
+            while not self.queue.empty():
+                directory, filename, checksum, checksum_file, dumps = self.queue.get()
+                await self._json_save(directory, filename, checksum, checksum_file, dumps)
+
+        asyncio.run(consume())
+
+        print("Hashcode Cleanup")
         self._hashcodes_cleanup()
 
+        print("Work Complete")
         return expansion
+
+    async def _json_save(self, directory, filename, checksum, checksum_file, dumps):
+        try:
+            # Assume that the path will already exist.
+            # We'll take a hit on the first file in each new path but save the overhead
+            # of checking on each subsequent one. This assumes that most objects will
+            # have multiple nested objects.
+            async with async_open(filename, "w") as f:
+                await f.write(dumps)
+            async with async_open(checksum_file, "w") as f:
+                await f.write(checksum)
+
+        except FileNotFoundError:
+            os.makedirs(directory, exist_ok=True)
+            async with async_open(filename, "w") as f:
+                await f.write(dumps)
+            async with async_open(checksum_file, "w") as f:
+                await f.write(checksum)
 
     def _execute(self, traversal, indent, my_path_component):
         """Main...
@@ -136,7 +162,8 @@ class Expander:
 
         checksum, checksum_file = self._hash_function(dumps)
 
-        self._json_save(directory, filename, checksum, checksum_file, dumps)
+        self.queue.put((directory, filename, checksum, checksum_file, dumps))
+        # self._json_save(directory, filename, checksum, checksum_file, dumps)
 
         if checksum:
             self.hashcodes[checksum].append(filename)
@@ -182,34 +209,13 @@ class Expander:
 
         return False
 
-    def _json_save(self, directory, filename, checksum, checksum_file, dumps):
-        return
-
-        try:
-            # Assume that the path will already exist.
-            # We'll take a hit on the first file in each new path but save the overhead
-            # of checking on each subsequent one. This assumes that most objects will
-            # have multiple nested objects.
-            with open(filename, "w") as f:
-                f.write(dumps)
-            with open(checksum_file, "w") as f:
-                f.write(checksum)
-
-        except FileNotFoundError:
-            os.makedirs(directory, exist_ok=True)
-            with open(filename, "w") as f:
-                f.write(dumps)
-            with open(checksum_file, "w") as f:
-                f.write(checksum)
-
-
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
 
     def _recursion_instance(self, *, path, data, leaf_nodes):
         instance = Expander(
-            expansion_pool=self.expansion_pool,
             logger=self.logger,
+            queue=self.queue,
             #
             data=data,
             leaf_nodes=leaf_nodes,
