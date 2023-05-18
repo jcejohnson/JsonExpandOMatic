@@ -128,20 +128,20 @@ class Expander:
         if leaf_node and not leaf_node.WHAT == LeafNode.What.DUMP:
             return True
 
-        directory: str = os.path.dirname(self.path)
-        data_file: str = f"{os.path.basename(self.path)}.json"
-
-        assert isinstance(directory, str)
-        assert isinstance(data_file, str)
-
         dumps = json.dumps(self.data, **self.json_dump_kwargs)
+
+        directory = os.path.dirname(self.path)
+        filename = os.path.basename(self.path)
+        data_file = f"{filename}.json"
+
+        checksum, checksumfile_suffix = self._hash_function(dumps)
+        checksum_file = f"{filename}.{checksumfile_suffix}"
+
         self.work.append((directory, data_file, dumps))
 
-        checksum, file_suffix = self._hash_function(dumps)
         if checksum:
-            md5_file: str = f"{os.path.basename(self.path)}.{file_suffix}"
             # self.work.append((directory, data_file, dumps, md5_file, checksum))
-            self.work.append((directory, md5_file, checksum))
+            self.work.append((directory, checksum_file, checksum))
             self.hashcodes[checksum].append(data_file)
         # else:
         #     self.work.append((directory, data_file, dumps, None, None))
