@@ -1,3 +1,4 @@
+import concurrent.futures
 import collections
 import hashlib
 import json
@@ -9,8 +10,21 @@ from .leaf_node import LeafNode
 
 from aiofile import async_open
 import asyncio
-
+from .expansion_pool import ExpansionPool
 import threading
+
+def _write_file(directory, filename, data):
+    try:
+        # Assume that the path will already exist.
+        # We'll take a hit on the first file in each new path but save the overhead
+        # of checking on each subsequent one. This assumes that most objects will
+        # have multiple nested objects.
+        with open(filename, "w") as f:
+            f.write(data)
+    except FileNotFoundError:
+        os.makedirs(directory, exist_ok=True)
+        with open(filename, "w") as f:
+            f.write(data)
 
 class Expander:
     """Expand a dict or list into one or more json files."""
@@ -25,7 +39,7 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
-        self.queue = queue or Queue()
+        self.queue = queue
 
         self.options = options if options is not None else dict()
 
@@ -35,7 +49,7 @@ class Expander:
         if self.hash_mode == Expander.HASH_MD5:
             self._hash_function = self._hash_md5
         else:
-            self._hash_function = lambda *args, **kwargs: False
+            self._hash_function = lambda *args, **kwargs: None, None
 
         # Map hashcodes of dict objects to the json files they are saved as.
         #   key   -- hashcode as specified by self.hash_mode
@@ -48,16 +62,18 @@ class Expander:
 
         self._dump = lambda *args : None
 
-        print("Work Work")
-        expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
-        print(self.queue.qsize())
+        pool_size = int(os.cpu_count()/2+1)
+        print(f"Pool size is {pool_size}")
+        with concurrent.futures.ProcessPoolExecutor(pool_size) as pool:
+            self.queue = pool.queue
 
-        async def consume():
+            print("Begin Work")
+            expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+            print(self.queue.qsize())
+
             while not self.queue.empty():
                 directory, filename, checksum, checksum_file, dumps = self.queue.get()
-                await self._json_save(directory, filename, checksum, checksum_file, dumps)
-
-        asyncio.run(consume())
+                pool.submit(_write_file, directory, filename, checksum, checksum_file, dumps)
 
         print("Hashcode Cleanup")
         self._hashcodes_cleanup()
@@ -152,26 +168,24 @@ class Expander:
             return True
 
         directory: str = os.path.dirname(self.path)
-        filename: str = f"{self.path}.json"
+        data_file: str = f"{self.path}.json"
+
         assert isinstance(directory, str)
-        assert isinstance(filename, str)
+        assert isinstance(data_file, str)
 
-        # Use tabs for indents.
-        # This will save a surprising amount of space in large files.
-        dumps = json.dumps(self.data, indent="\t", sort_keys=True)
+        dumps = json.dumps(self.data, indent="", sort_keys=False)
+        self.queue.put((directory, data_file, dumps))
 
-        checksum, checksum_file = self._hash_function(dumps)
-
-        self.queue.put((directory, filename, checksum, checksum_file, dumps))
-        # self._json_save(directory, filename, checksum, checksum_file, dumps)
-
+        checksum, file_suffix = self._hash_function(dumps)
         if checksum:
-            self.hashcodes[checksum].append(filename)
+            md5_file: str = f"{self.path}.{file_suffix}"
+            self.queue.put((directory, md5_file, checksum))
+            self.hashcodes[checksum].append(data_file)
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
-        filename = os.path.basename(filename)
-        self.data = {self.ref_key: f"{directory}/{filename}"}
+        data_file = os.path.basename(data_file)
+        self.data = {self.ref_key: f"{directory}/{data_file}"}
 
         return True
 
@@ -187,7 +201,7 @@ class Expander:
         Returns checksum.
         """
         checksum = hashlib.md5(dumps.encode()).hexdigest()
-        return checksum, f"{self.path}.md5"
+        return checksum, "md5"
 
     def _is_leaf_node(self, when):
         for c in self.leaf_nodes:

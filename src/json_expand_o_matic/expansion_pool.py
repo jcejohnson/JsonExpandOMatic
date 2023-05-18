@@ -1,3 +1,4 @@
+import os
 import logging
 import concurrent.futures
 from queue import Queue
@@ -14,6 +15,8 @@ class ExpansionPool:
         self._futures: Queue = Queue()
         self._results = list()
         self._auto_destroy: bool = True
+        self.pool_size: int = None
+        self.queue = Queue()
 
     @classmethod
     def create_singleton(cls, auto_destroy: bool=True):
@@ -26,7 +29,8 @@ class ExpansionPool:
         cls.INSTANCE = None
 
     def execute(self, callable: Callable):
-        with concurrent.futures.ThreadPoolExecutor() as self._pool:
+        self.pool_size = int(os.cpu_count/2+1)
+        with concurrent.futures.ProcessPoolExecutor(self.pool_size) as self._pool:
             result = callable()
 
             while not self._futures.empty():
