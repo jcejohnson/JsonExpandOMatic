@@ -50,25 +50,14 @@ class JsonExpandOMatic:
 
         from .expander import Expander
 
-        if threaded:
-            from .expansion_pool import ExpansionPool
-
-            expansion_pool = ExpansionPool()
-        else:
-            expansion_pool = None
-
         expander = Expander(
             logger=self.logger,
             path=self.path,
             data={root_element: data},
             leaf_nodes=LeafNode.construct(leaf_nodes),
-            expansion_pool=expansion_pool,
             **expander_options,
         )
-        if threaded:
-            result = expansion_pool.execute(expander.execute)
-        else:
-            result = expander.execute()
+        result = expander.execute()
         self.hashcodes = expander.hashcodes
 
         return result

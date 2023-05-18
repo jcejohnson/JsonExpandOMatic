@@ -20,11 +20,11 @@ def _write_file(request):
         # We'll take a hit on the first file in each new path but save the overhead
         # of checking on each subsequent one. This assumes that most objects will
         # have multiple nested objects.
-        with open(directory / filename, "w") as f:
+        with open(f"{directory}/{filename}", "w") as f:
             f.write(data)
     except FileNotFoundError:
         os.makedirs(directory, exist_ok=True)
-        with open(directory / filename, "w") as f:
+        with open(f"{directory}/{filename}", "w") as f:
             f.write(data)
     return time.time() - begin
 

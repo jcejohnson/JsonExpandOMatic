@@ -28,14 +28,14 @@ class Expander:
         self.ref_key = self.options.get("ref_key", "$ref")
 
         self.json_dump_kwargs = self.options.get(
-            "json_dump_kwargs", {"indent": None, "sort_keys": False, "separators": (",", ":")}
+            "json_dump_kwargs", {"indent": "", "sort_keys": False, "separators": (",", ":")}
         )
 
         self.hash_mode = self.options.get("hash_mode", None)
         if self.hash_mode == Expander.HASH_MD5:
             self._hash_function = self._hash_md5
         else:
-            self._hash_function = lambda *args, **kwargs: None, None
+            self._hash_function = lambda *args, **kwargs: (None, None)
 
         # Map hashcodes of dict objects to the json files they are saved as.
         #   key   -- hashcode as specified by self.hash_mode
@@ -139,11 +139,12 @@ class Expander:
 
         checksum, file_suffix = self._hash_function(dumps)
         if checksum:
-            md5_file: str = f"{self.path}.{file_suffix}"
-            self.work.append((directory, data_file, dumps, md5_file, checksum))
+            md5_file: str = f"{os.path.basename(self.path)}.{file_suffix}"
+            # self.work.append((directory, data_file, dumps, md5_file, checksum))
+            self.work.append((directory, md5_file, checksum))
             self.hashcodes[checksum].append(data_file)
-        else:
-            self.work.append((directory, data_file, dumps, None, None))
+        # else:
+        #     self.work.append((directory, data_file, dumps, None, None))
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
@@ -192,7 +193,6 @@ class Expander:
     def _recursion_instance(self, *, path, data, leaf_nodes):
         instance = Expander(
             logger=self.logger,
-            work=self.work,
             #
             data=data,
             leaf_nodes=leaf_nodes,
@@ -200,6 +200,7 @@ class Expander:
             #
             **self.options,
         )
+        instance.work=self.work
         return instance
 
     def _recursively_expand(self, *, key):
