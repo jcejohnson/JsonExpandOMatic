@@ -33,7 +33,12 @@ case ${self} in
     ;;
 
   tox.sh)
+<<<<<<< HEAD
     which tox >/dev/null || (set -x ; venv/bin/pip install tox)
+=======
+    which tox >/dev/null || [ -x venv/bin/tox ] || (set -x ; venv/bin/pip install tox)
+    [ ! -x venv/bin/tox ] || exec venv/bin/tox "@"
+>>>>>>> main
     exec tox "$@"
     ;;
 
