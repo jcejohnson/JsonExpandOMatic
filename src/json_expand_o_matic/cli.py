@@ -59,14 +59,24 @@ def expand(logger, output_path, input_file, *leaf_nodes_input):
 
     from .expander import Expander
 
+    expansion_options = {
+        key: func(os.environ.get(var))
+        for key, func, var in [
+            ("pool_size", int, "JEOM_POOL_SIZE"),
+            ("pool_ratio", float, "JEOM_POOL_RATIO"),
+            ("zip_root", str, "JEOM_ZIP_ROOT"),
+            ("zip_file", str, "JEOM_ZIP_FILE"),
+        ]
+        if var in os.environ
+    }
+
     JsonExpandOMatic(logger=logger, path=output_path).expand(
         data=json.load(open(input_file)),
         root_element="root",
         preserve=False,
         leaf_nodes=leaf_nodes,
         hash_mode=Expander.HASH_MD5,
-        pool_size=int(os.environ.get("JEOM_POOL_SIZE") or 1),
-        pool_ratio=float(os.environ.get("JEOM_POOL_RATIO") or 1),
+        **expansion_options
         # leaf_nodes=["/.*"]
         # leaf_nodes=["/root/actors/.*/movies/.*"]
         # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]

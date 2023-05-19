@@ -3,7 +3,6 @@ import hashlib
 import json
 import os
 
-from .expansion_pool import ExpansionPool
 from .leaf_node import LeafNode
 
 
@@ -20,12 +19,19 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
-        self.work = None
-
         self.options = options if options is not None else dict()
+
+        # options will not include pool or zip options when called recursively.
         self.pool_options = {
             key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("pool_")}
         }
+        self.zip_options = {
+            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("zip_")}
+        }
+
+        assert (
+            (not self.pool_options and not self.zip_options) or self.pool_options or self.zip_options
+        ), f"Cannot mix {sorted(self.pool_options.keys())} and {sorted(self.zip_options.keys())}"
 
         self.ref_key = self.options.get("ref_key", "$ref")
 
@@ -51,18 +57,29 @@ class Expander:
         # Replace the _dump() method with a no-op for the root of the data.
         self._dump = lambda *args: None
 
-        pool = ExpansionPool(logger=self.logger, **self.pool_options)
-        self.work = pool.work
+        if self.zip_options:
+            from .expansion_zipper import ExpansionZipper
 
-        expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+            pool, work = ExpansionZipper(logger=self.logger, output_path=self.path, **self.zip_options).setup()
+            self.path = pool.zip_root
+        elif self.pool_options:
+            from .expansion_pool import ExpansionPool
 
-        pool.drain()
+            pool, work = ExpansionPool(logger=self.logger, **self.pool_options).setup()
+        else:
+            from .expansion_pool import ExpansionPool
+
+            pool, work = ExpansionPool(logger=self.logger, pool_disable=True).setup()
+
+        expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="", work=work)
+
+        pool.finalize()
 
         self._hashcodes_cleanup()
 
         return expansion
 
-    def _execute(self, traversal, indent, my_path_component):
+    def _execute(self, traversal, indent, my_path_component, work):
         """Main...
 
         Parameters
@@ -83,9 +100,10 @@ class Expander:
             data
         """
 
-        self.traversal = traversal
         self.indent = indent
         self.my_path_component = my_path_component
+        self.traversal = traversal
+        self.work = work
 
         self._log(f"path [{self.path}] traversal [{self.traversal}]")
 
@@ -189,32 +207,24 @@ class Expander:
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
 
-    def _recursion_instance(self, *, path, data, leaf_nodes):
-        instance = Expander(
-            logger=self.logger,
-            #
-            data=data,
-            leaf_nodes=leaf_nodes,
-            path=path,
-            #
-            **self.options,
-        )
-        instance.work = self.work
-        return instance
-
     def _recursively_expand(self, *, key):
         if not (isinstance(self.data[key], dict) or isinstance(self.data[key], list)):
             return
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        expander = self._recursion_instance(
+        expander = Expander(
+            logger=self.logger,
             path=os.path.join(self.path, path_component),
             data=self.data[key],
             leaf_nodes=self.leaf_nodes,
+            **self.options,
         )
         self.data[key] = expander._execute(
-            indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}"
+            indent=self.indent + 2,
+            my_path_component=path_component,
+            traversal=f"{self.traversal}/{key}",
+            work=self.work,
         )
 
         # Add the child's hashcodes to our own so that when we unroll the recursion the root
