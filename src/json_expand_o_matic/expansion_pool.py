@@ -19,7 +19,7 @@ def _write_file(request):
     begin = time.time()
     global work
 
-    '''
+    """
     the_work = [work[request][0]]
     if request < 0:
         the_work.extend(work[request][1:3])
@@ -38,7 +38,7 @@ def _write_file(request):
         directory, filename, data, checksum_filename, checksum = the_work
     else:
         assert l == 3 or l == 5, f"Invalid work length {l}"
-    '''
+    """
     directory, filename, data, checksum_filename, checksum = work[request]
 
     def do():
@@ -64,14 +64,14 @@ class ExpansionPool:
     def __init__(self, *, logger: logging.Logger, pool_ratio: float = 0.8, pool_size: int = 0):
         assert logger, "logger is required"
         self.logger = logger
-        self.work = list()
+        self.work: list = list()
 
         # If `pool_*` are both falsy no pool will be used (i.e. - work is serialized).
         # If only `pool_size` is falsy, pool_size = os.cpu_count() * pool_ratio.
         # If `pool_size` is truthy it is used as-is and `pool_ratio` is ignored.
 
-        self.pool_ratio = abs(pool_ratio or 1)  # Only used if `pool_size` is falsy.
-        self.pool_size = abs(pool_size or int(os.cpu_count() * self.pool_ratio) or 1)
+        self.pool_ratio = abs(pool_ratio) or 1  # Only used if `pool_size` is falsy.
+        self.pool_size = abs(pool_size) or int((os.cpu_count() or 1) * self.pool_ratio) or 1
 
     def drain(self):
         begin = time.time()

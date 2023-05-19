@@ -33,4 +33,4 @@
 
 from .expand_o_matic import JsonExpandOMatic
 
-VERSION = "v0.2.0"
+VERSION = "v0.2.1"
