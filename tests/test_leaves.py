@@ -12,6 +12,10 @@ class TestLeaves:
     # Our raw test data.
     _raw_data = None
 
+    @pytest.fixture(params=[False, True])
+    def threaded(self, request):
+        return request.param
+
     @pytest.fixture
     def raw_data(self, resource_path_root):
         if not TestLeaves._raw_data:
@@ -28,35 +32,37 @@ class TestLeaves:
     def original_data(self, raw_data):
         return json.loads(json.dumps(raw_data))
 
-    def test_actors1(self, tmpdir, test_data, original_data):
+    def test_actors1(self, tmpdir, test_data, original_data, threaded):
         """Verify that we can create a json file for each actor and not recurse any further."""
 
-        self._actors_test(tmpdir, test_data, original_data, "/root/actors/.*")
+        self._actors_test(tmpdir, test_data, original_data, "/root/actors/.*", threaded)
 
-    def test_actors2(self, tmpdir, test_data, original_data):
+    def test_actors2(self, tmpdir, test_data, original_data, threaded):
         """Same as test_actors1 but with a more precise regex."""
 
-        self._actors_test(tmpdir, test_data, original_data, "/root/actors/[^/]+")
+        self._actors_test(tmpdir, test_data, original_data, "/root/actors/[^/]+", threaded)
 
-    def test_charlie1(self, tmpdir, test_data, original_data):
+    def test_charlie1(self, tmpdir, test_data, original_data, threaded):
         """Verify that we can single out an actor."""
-        self._charlie_test(tmpdir, test_data, original_data, "/root/actors/charlie_chaplin")
+        self._charlie_test(tmpdir, test_data, original_data, "/root/actors/charlie_chaplin", threaded)
 
-    def test_charlie2(self, tmpdir, test_data, original_data):
+    def test_charlie2(self, tmpdir, test_data, original_data, threaded):
         """Like test_charlie1 but with a loose wildcard."""
-        self._charlie_test(tmpdir, test_data, original_data, "/root/actors/[abcxyz].*")
+        self._charlie_test(tmpdir, test_data, original_data, "/root/actors/[abcxyz].*", threaded)
 
-    def test_charlie3(self, tmpdir, test_data, original_data):
+    def test_charlie3(self, tmpdir, test_data, original_data, threaded):
         """Like test_charlie1 but with tighter regex."""
-        self._charlie_test(tmpdir, test_data, original_data, "/root/actors/[abcxyz][^/]+")
+        self._charlie_test(tmpdir, test_data, original_data, "/root/actors/[abcxyz][^/]+", threaded)
 
-    def test_nested1(self, tmpdir, test_data, original_data):
+    def test_threaded_nested1(self, tmpdir, test_data, original_data, threaded):
         """Test a simple leaf_nodes scenario."""
+
         expanded = JsonExpandOMatic(path=tmpdir).expand(
             test_data,
             root_element="root",
             preserve=False,
             leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}],
+            threaded=threaded,
         )
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
@@ -84,7 +90,7 @@ class TestLeaves:
         assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies.json")
         assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/hobbies")
 
-    def test_nested1_equivalency(self, tmpdir, test_data, original_data):
+    def test_nested1_equivalency(self, tmpdir, test_data, original_data, threaded):
         """
         In a nested leaf-node expression the dict key is treated as it
         would be in the non-nested case.
@@ -104,6 +110,7 @@ class TestLeaves:
             root_element="root",
             preserve=False,
             leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "/[^/]+/filmography"]}],
+            threaded=threaded,
         )
         nested_files = [x.replace(f"{tmpdir}/n", "") for x in glob.glob(f"{tmpdir}/n", recursive=True)]
 
@@ -112,12 +119,13 @@ class TestLeaves:
             root_element="root",
             preserve=False,
             leaf_nodes=["/root/actors/.*/movies/.*", "/root/actors/.*/filmography"],
+            threaded=threaded,
         )
         flattened_files = [x.replace(f"{tmpdir}/f", "") for x in glob.glob(f"{tmpdir}/f", recursive=True)]
 
         assert nested_files == flattened_files
 
-    def test_nested2(self, tmpdir, test_data, original_data):
+    def test_nested2(self, tmpdir, test_data, original_data, threaded):
         """Test a targeted leaf_node exmple.
 
         The expressions listed in the dict value are relative to the
@@ -133,6 +141,7 @@ class TestLeaves:
             root_element="root",
             preserve=False,
             leaf_nodes=[{"/root/actors/.*": ["/dwayne_johnson/movies", "/charlie_chaplin/spouses"]}],
+            threaded=threaded,
         )
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
@@ -152,7 +161,7 @@ class TestLeaves:
         assert os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies.json")
         assert not os.path.exists(f"{tmpdir}/root/actors/dwayne_johnson/movies")
 
-    def xtest_enhanced_nested1(self, tmpdir, test_data, original_data):
+    def xtest_enhanced_nested1(self, tmpdir, test_data, original_data, threaded):
         """Enhanced nested #1...
 
         But what if we want a single json file per actor to include
@@ -201,6 +210,7 @@ class TestLeaves:
             root_element="root",
             preserve=False,
             leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*", "<A:/.*"]}],
+            threaded=threaded,
         )
 
         # This is the same thing you would expect in the non-nested case.
@@ -232,9 +242,13 @@ class TestLeaves:
             assert data.get["spouses"].get("lita_grey", None)
             assert data.get["spouses"]["lita_grey"].get("children", None)
 
-    def _actors_test(self, tmpdir, test_data, original_data, regex):
+    def _actors_test(self, tmpdir, test_data, original_data, regex, threaded):
         expanded = JsonExpandOMatic(path=tmpdir).expand(
-            test_data, root_element="root", preserve=False, leaf_nodes=[regex]
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=[regex],
+            threaded=threaded,
         )
 
         # preserve=True allows mangling of test_data by expand()
@@ -254,9 +268,13 @@ class TestLeaves:
         self._assert_actor_dirs(tmpdir, f=_not)
         self._assert_movies(tmpdir, f=_not)
 
-    def _charlie_test(self, tmpdir, test_data, original_data, regex):
+    def _charlie_test(self, tmpdir, test_data, original_data, regex, threaded):
         expanded = JsonExpandOMatic(path=tmpdir).expand(
-            test_data, root_element="root", preserve=False, leaf_nodes=[regex]
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=[regex],
+            threaded=threaded,
         )
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 
 from . import VERSION, JsonExpandOMatic
@@ -63,7 +64,9 @@ def expand(logger, output_path, input_file, *leaf_nodes_input):
         root_element="root",
         preserve=False,
         leaf_nodes=leaf_nodes,
-        hash_mode=Expander.HASH_MD5
+        hash_mode=Expander.HASH_MD5,
+        pool_size=int(os.environ.get("JEOM_POOL_SIZE") or 1),
+        pool_ratio=float(os.environ.get("JEOM_POOL_RATIO") or 1),
         # leaf_nodes=["/.*"]
         # leaf_nodes=["/root/actors/.*/movies/.*"]
         # leaf_nodes=[{"/root/actors/.*": ["/[^/]+/movies/.*"]}]

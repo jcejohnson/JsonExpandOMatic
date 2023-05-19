@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 
+from .expansion_pool import ExpansionPool
 from .leaf_node import LeafNode
 
 
@@ -19,13 +20,24 @@ class Expander:
         self.data = data
         self.leaf_nodes = leaf_nodes
 
-        self.ref_key = options.get("ref_key", "$ref")
+        self.work = None
 
-        self.hash_mode = options.get("hash_mode", None)
+        self.options = options if options is not None else dict()
+        self.pool_options = {
+            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("pool_")}
+        }
+
+        self.ref_key = self.options.get("ref_key", "$ref")
+
+        self.json_dump_kwargs = self.options.get(
+            "json_dump_kwargs", {"indent": "", "sort_keys": False, "separators": (",", ":")}
+        )
+
+        self.hash_mode = self.options.get("hash_mode", None)
         if self.hash_mode == Expander.HASH_MD5:
             self._hash_function = self._hash_md5
         else:
-            self._hash_function = lambda *args, **kwargs: False
+            self._hash_function = lambda *args, **kwargs: (None, None)
 
         # Map hashcodes of dict objects to the json files they are saved as.
         #   key   -- hashcode as specified by self.hash_mode
@@ -39,7 +51,12 @@ class Expander:
         # Replace the _dump() method with a no-op for the root of the data.
         self._dump = lambda *args: None
 
+        pool = ExpansionPool(logger=self.logger, **self.pool_options)
+        self.work = pool.work
+
         expansion = self._execute(indent=0, my_path_component=os.path.basename(self.path), traversal="")
+
+        pool.drain()
 
         self._hashcodes_cleanup()
 
@@ -113,23 +130,25 @@ class Expander:
         if leaf_node and not leaf_node.WHAT == LeafNode.What.DUMP:
             return True
 
+        dumps = json.dumps(self.data, **self.json_dump_kwargs)
+
         directory = os.path.dirname(self.path)
-        filename = f"{self.path}.json"
+        filename = os.path.basename(self.path)
+        data_file = f"{filename}.json"
 
-        # Use tabs for indents.
-        # This will save a surprising amount of space in large files.
-        dumps = json.dumps(self.data, indent="\t", sort_keys=True)
+        checksum, checksumfile_suffix = self._hash_function(dumps)
+        checksum_file = f"{filename}.{checksumfile_suffix}"
 
-        self._json_save(directory, filename, dumps)
-
-        checksum = self._hash_function(dumps)
         if checksum:
-            self.hashcodes[checksum].append(filename)
+            self.work.append((directory, data_file, dumps, checksum_file, checksum))
+            self.hashcodes[checksum].append(data_file)
+        else:
+            self.work.append((directory, data_file, dumps, None, None))
 
         # Build a reference to the file we just wrote.
         directory = os.path.basename(directory)
-        filename = os.path.basename(filename)
-        self.data = {self.ref_key: f"{directory}/{filename}"}
+        data_file = os.path.basename(data_file)
+        self.data = {self.ref_key: f"{directory}/{data_file}"}
 
         return True
 
@@ -145,10 +164,7 @@ class Expander:
         Returns checksum.
         """
         checksum = hashlib.md5(dumps.encode()).hexdigest()
-        filename = f"{self.path}.md5"
-        with open(filename, "w") as f:
-            f.write(checksum)
-        return checksum
+        return checksum, "md5"
 
     def _is_leaf_node(self, when):
         for c in self.leaf_nodes:
@@ -159,8 +175,7 @@ class Expander:
                 return self._dump(c)
 
             self._log(f">>> Expand children of [{c.raw}]")
-            Expander(
-                logger=self.logger,
+            self._recursion_instance(
                 path=os.path.dirname(self.path),
                 data={os.path.basename(self.path): self.data},
                 leaf_nodes=c.children,
@@ -171,21 +186,21 @@ class Expander:
 
         return False
 
-    def _json_save(self, directory, filename, dumps):
-        try:
-            # Assume that the path will already exist.
-            # We'll take a hit on the first file in each new path but save the overhead
-            # of checking on each subsequent one. This assumes that most objects will
-            # have multiple nested objects.
-            with open(filename, "w") as f:
-                f.write(dumps)
-        except FileNotFoundError:
-            os.makedirs(directory)
-            with open(filename, "w") as f:
-                f.write(dumps)
-
     def _log(self, string):
         self.logger.debug(" " * self.indent + string)
+
+    def _recursion_instance(self, *, path, data, leaf_nodes):
+        instance = Expander(
+            logger=self.logger,
+            #
+            data=data,
+            leaf_nodes=leaf_nodes,
+            path=path,
+            #
+            **self.options,
+        )
+        instance.work = self.work
+        return instance
 
     def _recursively_expand(self, *, key):
         if not (isinstance(self.data[key], dict) or isinstance(self.data[key], list)):
@@ -193,12 +208,10 @@ class Expander:
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        expander = Expander(
-            logger=self.logger,
+        expander = self._recursion_instance(
             path=os.path.join(self.path, path_component),
             data=self.data[key],
             leaf_nodes=self.leaf_nodes,
-            hash_mode=self.hash_mode,
         )
         self.data[key] = expander._execute(
             indent=self.indent + 2, my_path_component=path_component, traversal=f"{self.traversal}/{key}"
