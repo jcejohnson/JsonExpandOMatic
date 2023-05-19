@@ -19,7 +19,7 @@ def _write_file(request):
     begin = time.time()
     global work
 
-    '''
+    """
     the_work = [work[request][0]]
     if request < 0:
         the_work.extend(work[request][1:3])
@@ -38,7 +38,7 @@ def _write_file(request):
         directory, filename, data, checksum_filename, checksum = the_work
     else:
         assert l == 3 or l == 5, f"Invalid work length {l}"
-    '''
+    """
     directory, filename, data, checksum_filename, checksum = work[request]
 
     def do():

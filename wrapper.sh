@@ -33,8 +33,9 @@ case ${self} in
     ;;
 
   tox.sh)
-    [ -x venv/bin/tox ] || (set -x ; venv/bin/pip install tox)
-    exec venv/bin/tox "$@"
+    which tox >/dev/null || [ -x venv/bin/tox ] || (set -x ; venv/bin/pip install tox)
+    [ ! -x venv/bin/tox ] || exec venv/bin/tox "@"
+    exec tox "$@"
     ;;
 
   wrapper.sh)
