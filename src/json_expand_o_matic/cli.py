@@ -64,6 +64,7 @@ def expand(logger, output_path, input_file, *leaf_nodes_input):
         for key, func, var in [
             ("pool_size", int, "JEOM_POOL_SIZE"),
             ("pool_ratio", float, "JEOM_POOL_RATIO"),
+            ("pool_mode", float, "JEOM_POOL_MODE"),
             ("zip_root", str, "JEOM_ZIP_ROOT"),
             ("zip_file", str, "JEOM_ZIP_FILE"),
         ]
