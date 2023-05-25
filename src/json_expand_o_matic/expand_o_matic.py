@@ -15,7 +15,8 @@ class JsonExpandOMatic:
             Target directory where expand will write the expanded json data
             and/or where contract will find the expanded data to be loaded.
         """
-        self.path = os.path.abspath(path)
+        self.path = path
+        self.abspath = os.path.abspath(path)
         self.logger = logger
 
     def expand(self, data, root_element="root", preserve=True, leaf_nodes=[], **expander_options):
@@ -52,7 +53,7 @@ class JsonExpandOMatic:
 
         expander = Expander(
             logger=self.logger,
-            path=self.path,
+            path=self.abspath,
             data={root_element: data},
             leaf_nodes=LeafNode.construct(leaf_nodes),
             **expander_options,
@@ -83,4 +84,4 @@ class JsonExpandOMatic:
 
         from .contractor import Contractor
 
-        return Contractor(logger=self.logger, path=self.path, root_element=root_element).execute()
+        return Contractor(logger=self.logger, path=self.abspath, root_element=root_element).execute()

@@ -2,44 +2,65 @@
 Use a ProcessPoolExecutor to save the data in parallel rather than serially.
 """
 
-import concurrent.futures
 import logging
+import multiprocessing as mp
 import os
 import time
+from ctypes import POINTER, Structure, c_ubyte, cast, create_string_buffer, string_at
+from enum import Enum
+from typing import Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
 
-def _initialize(data):
-    global work
-    work = data
+class Modes(Enum):
+    ArrayOfTuples = "ArrayOfTuples"
+    SharedMemoryArray = "SharedMemoryArray"
+
+
+__mode__ = Modes.SharedMemoryArray
+__unpack__ = None
+__work__ = None
+
+
+class WorkTuple(Structure):
+    _fields_ = [
+        ("directory", POINTER(c_ubyte)),
+        ("filename", POINTER(c_ubyte)),
+        ("data", POINTER(c_ubyte)),
+        ("checksum_filename", POINTER(c_ubyte)),
+        ("checksum", POINTER(c_ubyte)),
+    ]
+
+    def __iter__(self):
+        yield self.directory
+        yield self.filename
+        yield self.data
+        yield self.checksum_filename
+        yield self.checksum
+
+
+def _initialize(mode, data):
+    global __mode__
+    global __work__
+    global __unpack__
+
+    __mode__ = mode
+    __work__ = data
+
+    if __mode__ == Modes.SharedMemoryArray:
+        __unpack__ = lambda request: [  # noqa: E731
+            string_at(element).decode("utf-8") for element in __work__[request]
+        ]
+    elif __mode__ == Modes.ArrayOfTuples:
+        __unpack__ = lambda request: __work__[request]  # noqa: E731
 
 
 def _write_file(request):
+    global __unpack__
+
     begin = time.time()
-    global work
-
-    """
-    the_work = [work[request][0]]
-    if request < 0:
-        the_work.extend(work[request][1:3])
-    elif request > 0:
-        the_work.extend(work[request][3:5])
-    else:
-        the_work = work[request]
-
-    the_work = work[request]
-    l = len(the_work)
-
-    if l == 3:
-        directory, filename, data = the_work
-        checksum_filename = checksum = None
-    elif l == 5:
-        directory, filename, data, checksum_filename, checksum = the_work
-    else:
-        assert l == 3 or l == 5, f"Invalid work length {l}"
-    """
-    directory, filename, data, checksum_filename, checksum = work[request]
+    directory, filename, data, checksum_filename, checksum = __unpack__(request)
 
     def do():
         with open(f"{directory}/{filename}", "w") as f:
@@ -61,37 +82,80 @@ def _write_file(request):
 
 
 class ExpansionPool:
-    def __init__(self, *, logger: logging.Logger, pool_ratio: float = 0.8, pool_size: int = 0):
+    def __init__(
+        self,
+        *,
+        logger: logging.Logger,
+        pool_ratio: Optional[float] = None,
+        pool_size: Optional[int] = None,
+        pool_disable: Optional[bool] = False,
+        pool_mode: Union[str, Modes] = Modes.SharedMemoryArray,
+    ):
         assert logger, "logger is required"
         self.logger = logger
         self.work: list = list()
 
-        # If `pool_*` are both falsy no pool will be used (i.e. - work is serialized).
-        # If only `pool_size` is falsy, pool_size = os.cpu_count() * pool_ratio.
-        # If `pool_size` is truthy it is used as-is and `pool_ratio` is ignored.
+        self.mode = Modes(pool_mode)
 
-        self.pool_ratio = abs(pool_ratio) or 1  # Only used if `pool_size` is falsy.
-        self.pool_size = abs(pool_size) or int((os.cpu_count() or 1) * self.pool_ratio) or 1
+        self._set_pool_size(pool_ratio, pool_size, pool_disable)
 
-    def drain(self):
+        if self.pool_size > 1:
+            logger.info(f"PoolSize: [{self.pool_size}]. Mode [{self.mode.value}].")
+        else:
+            logger.info(f"PoolSize: [{self.pool_size}].")
+
+    def setup(self) -> Tuple["ExpansionPool", list]:
+        return self, self.work
+
+    def finalize(self):
         begin = time.time()
-        chunksize = 1 + int(len(self.work) / self.pool_size)
 
         if self.pool_size == 1:
-            global work
-            work = self.work
+            _initialize(Modes.ArrayOfTuples, self.work)
             results = [_write_file(i) for i in range(0, len(self.work))]
 
         else:
-            with concurrent.futures.ProcessPoolExecutor(
-                max_workers=self.pool_size, initializer=_initialize, initargs=(self.work,)
-            ) as pool:
-                futures = pool.map(_write_file, range(0, len(self.work)), chunksize=chunksize)
-                results = [f for f in futures]
-
-        pool = None
+            results = self._pooled_processing()
 
         self.elapsed = time.time() - begin
 
         self.work_time = sum(results)
         self.overhead = self.elapsed - self.work_time
+
+    def _pooled_processing(self, chunksize, data):
+        if self.mode == Modes.SharedMemoryArray:
+            data = self._prepare_shared_memory_array()
+        elif self.mode == Modes.ArrayOfTuples:
+            data = self.work
+
+        chunksize = 1 + int(len(self.work) / self.pool_size)
+
+        with mp.Pool(processes=self.pool_size, initializer=_initialize, initargs=(self.mode, data)) as pool:
+            futures = pool.map(_write_file, range(0, len(self.work)), chunksize=chunksize)
+            results = [f for f in futures]
+            return results
+
+    def _prepare_shared_memory_array(self):
+        value_list = [
+            WorkTuple(
+                *[cast(create_string_buffer(component.encode("utf-8")), POINTER(c_ubyte)) for component in work_unit]
+            )
+            for work_unit in self.work
+        ]
+        data = mp.Array(WorkTuple, value_list, lock=False)
+        return data
+
+    def _set_pool_size(self, pool_ratio, pool_size, pool_disable):
+        if pool_disable:
+            self.pool_size = 1
+        elif pool_size:
+            self.pool_size = abs(pool_size)
+        elif pool_size == 0 and not pool_ratio:
+            self.pool_size = os.cpu_count()
+        elif pool_ratio:
+            assert pool_size is None, "Programmer error."
+            self.pool_size = abs(int(os.cpu_count() * self.pool_ratio))
+        else:
+            assert pool_size is None, "Programmer error."
+            assert pool_ratio is None, "Programmer error."
+            self.pool_size = 1
