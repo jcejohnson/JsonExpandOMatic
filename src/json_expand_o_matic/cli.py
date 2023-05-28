@@ -105,13 +105,20 @@ def expand(logger, output_path, input_file, *leaf_nodes_input):
 
 
 def contract(logger, input_path, root_element="root"):
+    data = JsonExpandOMatic(
+        logger=logger,
+        path=input_path,
+    ).contract(
+        root_element=root_element,
+        lazy=os.environ.get("JEOM_LAZY", "FALSE").upper() == "TRUE",
+    )
     print(
         json.dumps(
             # You can also contract with jsonref (see the tests).
             # Our contract() method is here for convenience.
             # Due to its simple nature, it is also a bit more lightweight
             # than jsonref.
-            JsonExpandOMatic(logger=logger, path=input_path).contract(root_element=root_element),
+            data,
             indent=4,
             sort_keys=True,
         )
