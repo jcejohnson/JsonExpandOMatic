@@ -39,11 +39,24 @@ class ExpansionZipper:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, mode="a", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
             for directory, filename, data, checksum_filename, checksum in self.work:
+                assert data is not None
                 zip_file.writestr(f"{directory}/{filename}", data)
-                zip_file.writestr(
-                    f"{directory}/{checksum_filename}", checksum, compress_type=zipfile.ZIP_STORED, compresslevel=0
-                )
+                if checksum is not None:
+                    zip_file.writestr(
+                        f"{directory}/{checksum_filename}", checksum, compress_type=zipfile.ZIP_STORED, compresslevel=0
+                    )
 
         os.makedirs(self.output_path, exist_ok=True)
         with open(f"{self.output_path}/{self.zip_file}", "wb") as f:
             f.write(zip_buffer.getvalue())
+
+        if self.output_mode == OutputChoice.Zipped:
+            return
+
+        zip_file = zipfile.ZipFile(f"{self.output_path}/{self.zip_file}")
+        zip_file.extractall(self.output_path)
+
+        if self.output_mode == OutputChoice.KeepZip:
+            return
+
+        os.remove(f"{self.output_path}/{self.zip_file}")
