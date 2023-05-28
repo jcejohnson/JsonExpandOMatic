@@ -2,7 +2,14 @@ import io
 import logging
 import os
 import zipfile
-from typing import Optional, Tuple
+from enum import Enum
+from typing import Optional, Tuple, Union
+
+
+class OutputChoice(Enum):
+    KeepZip = "KeepZip"
+    UnZipped = "UnZipped"
+    Zipped = "Zipped"
 
 
 class ExpansionZipper:
@@ -10,18 +17,30 @@ class ExpansionZipper:
         self,
         *,
         logger: logging.Logger,
-        output_path: Optional[str] = None,
-        zip_root: Optional[str] = None,
-        zip_file: Optional[str] = None,
+        output_path: Optional[str] = None,  # . Where the output will be written.
+        zip_root: Optional[str] = None,  # .... Where all the files are within the zip.
+        zip_file: Optional[str] = None,  # .... Name of the zip file to create in `output_path`.
+        zip_output: Union[str, OutputChoice] = OutputChoice.UnZipped,  # Keep zipped, unzip or both.
     ):
         assert logger, "logger is required"
         self.logger = logger
         self.work: list = list()
 
+        self.output_mode = OutputChoice(zip_output)
+
         if output_path:
-            if not zip_file:
+            if zip_file and zip_root:
+                ...
+            elif not zip_file and not zip_root:
                 zip_file = os.path.basename(output_path)
-                output_path = os.path.dirname(output_path) or "."
+                zip_root = os.path.basename(output_path)
+                output_path = os.path.dirname(output_path)
+            elif zip_file:
+                zip_root = os.path.basename(output_path)
+                output_path = os.path.dirname(output_path)
+            elif zip_root:
+                zip_file = os.path.basename(output_path)
+
         else:
             output_path = "."
 

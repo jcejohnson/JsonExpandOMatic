@@ -23,10 +23,14 @@ class Expander:
 
         # options will not include pool or zip options when called recursively.
         self.pool_options = {
-            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("pool_")}
+            # See ExpansionPool
+            key: self.options.pop(key)
+            for key in {key for key in self.options.keys() if key.startswith("pool_")}
         }
         self.zip_options = {
-            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("zip_")}
+            # See ExpansionZipper
+            key: self.options.pop(key)
+            for key in {key for key in self.options.keys() if key.startswith("zip_")}
         }
 
         assert (
