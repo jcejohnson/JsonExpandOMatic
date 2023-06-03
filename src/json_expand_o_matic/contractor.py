@@ -3,33 +3,7 @@ import os
 from functools import partial
 from urllib.parse import urlparse
 
-
-class ContractionProxy:
-    def __init__(self, func) -> None:
-        self.func = func
-        self.proxied_data = None
-
-    @property  # type: ignore
-    def __class__(self):
-        return self.data.__class__
-
-    def __getattr__(self, name):
-        return getattr(self.data, name)
-
-    def __getitem__(self, name):
-        return self.data.__getitem__(name)
-
-    def __iter__(self):
-        return self.data.__iter__()
-
-    def __str__(self):
-        return self.data.__str__()
-
-    @property
-    def data(self):
-        if self.proxied_data is None:
-            self.proxied_data = self.func()
-        return self.proxied_data
+from .contraction_proxy import ContractionProxy
 
 
 class Contractor:
