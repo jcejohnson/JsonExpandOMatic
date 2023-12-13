@@ -34,6 +34,10 @@ class LazyMaker:
         self._all_models = {}
         self._lazy_models = {}
 
+    @property
+    def loader(self) -> LazyLoaderBase:
+        return self._loader
+
     def __getitem__(self, class_name: str) -> type:
         v = self._all_models.get(class_name)
         if v or class_name.endswith("LazyModel") or class_name.endswith("ActualModel"):

@@ -17,10 +17,8 @@ def usage():
 
 
 def main():
-    cmd = sys.argv[1]
-    argv = sys.argv[2:]
 
-    if not argv or sys.argv[2] == "--help" or "--help" in argv:
+    if len(sys.argv) < 2 or sys.argv[1] == "--help" or "--help" in sys.argv:
         usage()
         return
 
@@ -33,6 +31,9 @@ def main():
         argv = sys.argv[4:]
     else:
         logger = _get_expando_logger(logging.INFO)
+
+    cmd = sys.argv[1]
+    argv = sys.argv[2:]
 
     if not argv:
         usage()
