@@ -31,3 +31,4 @@ tox.sh
 # Our de-facto manual test output.
 output*
 log.txt
+.venv

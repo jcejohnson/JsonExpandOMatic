@@ -1,13 +1,31 @@
 import json
 import os
+from collections.abc import MutableMapping, MutableSequence
 
 import pytest  # type: ignore
 
-from collections.abc import MutableMapping, MutableSequence
-
 from json_expand_o_matic import JsonExpandOMatic
 from tests.testresources.lazy import LazyBaseModel, LazyDict, LazyList
-from tests.testresources.model import Actor, Model, LazyModel
+from tests.testresources.model import Actor, LazyModel, Model
+
+# Modify LazyDict so that we can count calls to __lazy_init_root__()
+
+setattr(LazyDict, "__lazy_init_root__original", LazyDict.__lazy_init_root__)
+setattr(LazyDict, "__lazy_init_root__counter", 0)
+
+
+def lazydict_patch(monkeypatch):
+    monkeypatch.setattr(LazyDict, "__lazy_init_root__", lazydict__lazy_init_root__counter)
+    LazyDict.__lazy_init_root__counter = 0  # type: ignore
+
+
+def lazydict__lazy_init_root__counter(*args, **kwargs):
+    LazyDict.__lazy_init_root__counter += 1  # type: ignore
+    LazyDict.__lazy_init_root__original(*args, **kwargs)  # type: ignore
+
+
+def lazydict__lazy_init_root__assertion(invocations):
+    assert LazyDict.__lazy_init_root__counter == invocations  # type: ignore
 
 
 class TestLazyLoading:
@@ -115,11 +133,13 @@ class TestLazyLoading:
         assert model.actors.__root__.lazy_ref == "root/actors.json"
         assert model.actors.__root__.lazy_base == tmpdir
 
-    def test_trigger_get(self, lazy_model):
+    def test_trigger_get(self, lazy_model, monkeypatch):
         """
         Test `instance["key"]` lazy load trigger.
         """
         model = lazy_model
+
+        lazydict_patch(monkeypatch)
 
         # Before we trigger the lazy load ...
         assert isinstance(model.actors, LazyDict)
@@ -135,6 +155,8 @@ class TestLazyLoading:
         # and replaced with a LazyDict instance containing the data specified
         # by the base/ref properties of the LazyBaseModel.
         charlie_chaplin = model.actors["charlie_chaplin"]
+
+        lazydict__lazy_init_root__assertion(1)
 
         # The nature of our data is such that model.actors.__root__ is not (yet)
         # a dict of Actors but, instead, a dict of LazyBaseModels that can be
@@ -153,11 +175,18 @@ class TestLazyLoading:
         assert charlie_chaplin.lazy_base == f"{model.lazy_base}/root"
         assert charlie_chaplin.lazy_type == Actor
 
-    def test_trigger_in(self, lazy_model):
+        #
+
+        model.actors["dwayne_johnson"]
+        lazydict__lazy_init_root__assertion(1)
+
+    def test_trigger_in(self, lazy_model, monkeypatch):
         """
         Test `"key" in instance` lazy load trigger.
         """
         model = lazy_model
+
+        lazydict_patch(monkeypatch)
 
         # This will trigger the lazy load.
         assert "charlie_chaplin" in model.actors
@@ -167,19 +196,27 @@ class TestLazyLoading:
             assert isinstance(key, str)
             assert isinstance(value, LazyBaseModel)
 
-    def test_trigger_keys(self, lazy_model):
+        lazydict__lazy_init_root__assertion(1)
+
+    def test_trigger_keys(self, lazy_model, monkeypatch):
         """
         Test `instance.keys()` lazy load trigger.
         """
         model = lazy_model
 
+        lazydict_patch(monkeypatch)
+
         # This will trigger the lazy load.
         assert sorted(model.actors.keys()) == ["charlie_chaplin", "dwayne_johnson"]
+
+        lazydict__lazy_init_root__assertion(1)
 
         assert isinstance(model.actors.__root__, dict)  # was LazyBaseModel
         for key, value in model.actors.__root__.items():
             assert isinstance(key, str)
             assert isinstance(value, LazyBaseModel)
+
+        lazydict__lazy_init_root__assertion(1)
 
     def test_trigger_len(self, lazy_model):
         """
@@ -193,17 +230,23 @@ class TestLazyLoading:
         assert isinstance(model.actors.__root__, dict)  # was LazyBaseModel
         assert len(model.actors) == 2
 
-    def test_actor(self, lazy_model):
+    def test_actor(self, lazy_model, monkeypatch):
         """
         Test properties of model.actors["some_actor"].
         """
         model = lazy_model
 
+        lazydict_patch(monkeypatch)
+
         charlie_chaplin = model.actors["charlie_chaplin"]
         assert not charlie_chaplin.lazy_data
 
+        lazydict__lazy_init_root__assertion(1)
+
         first_name = charlie_chaplin.first_name
         assert isinstance(charlie_chaplin.lazy_data, Actor)
+
+        lazydict__lazy_init_root__assertion(1)
 
         assert first_name == "Charlie"
         assert charlie_chaplin.last_name == "Chaplin"
@@ -213,6 +256,13 @@ class TestLazyLoading:
         # Before we trigger the lazy load ...
         assert isinstance(spouses, LazyDict)
         assert isinstance(spouses, MutableMapping)
+
+        lazydict__lazy_init_root__assertion(1)
+
+        # This will trigger another lazy load.
+        assert sorted(spouses.keys()) == ["lita_grey", "mildred_harris", "oona_oneill", "paulette_goddard"]
+
+        lazydict__lazy_init_root__assertion(2)
 
     def test_filmography(self, lazy_model):
         """
@@ -248,7 +298,9 @@ class TestLazyLoading:
         assert len(charlie_chaplin.filmography) == 3
 
         for film in model.actors["charlie_chaplin"].filmography:
-            assert isinstance(film, LazyBaseModel)
+            if not isinstance(film, LazyBaseModel):
+                breakpoint()
+            assert isinstance(film, LazyBaseModel), type(film)
 
         # A Film is just a list of things.
         assert model.actors["charlie_chaplin"].filmography[0][0] == "The Kid"

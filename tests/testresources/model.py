@@ -1,8 +1,9 @@
 from typing import Any, List, Union
-from pydantic import BaseModel as PydanticBaseModel
-from pydantic import Field
 
-from .lazy import LazyDict, LazyBaseModel, LazyList, LazyParserMixin
+from pydantic import BaseModel as PydanticBaseModel  # type: ignore
+from pydantic import Field  # type: ignore
+
+from .lazy import LazyBaseModel, LazyDict, LazyList, LazyParserMixin
 
 
 class CastMember(PydanticBaseModel):
