@@ -63,7 +63,7 @@ class JsonExpandOMatic:
 
         return result
 
-    def contract(self, root_element="root"):
+    def contract(self, root_element="root", **contractor_kwargs):
         """Contract (un-expand) the results of `expand()` into a dict.
 
         Loads:
@@ -84,4 +84,9 @@ class JsonExpandOMatic:
 
         from .contractor import Contractor
 
-        return Contractor(logger=self.logger, path=self.abspath, root_element=root_element).execute()
+        return Contractor(
+            logger=self.logger,
+            path=self.abspath,
+            root_element=root_element,
+            **contractor_kwargs,
+        ).execute()
