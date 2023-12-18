@@ -5,32 +5,12 @@ import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
 
+from .fixtures import Fixtures
 
-class TestLeaves:
+
+@pytest.mark.unit
+class TestLeaves(Fixtures):
     """Test `leaf_node` functionality."""
-
-    # Our raw test data.
-    _raw_data = None
-
-    @pytest.fixture(params=[False, True])
-    def threaded(self, request):
-        return request.param
-
-    @pytest.fixture
-    def raw_data(self, resource_path_root):
-        if not TestLeaves._raw_data:
-            TestLeaves._raw_data = json.loads((resource_path_root / "actor-data.json").read_text())
-        return TestLeaves._raw_data
-
-    # Fixtures to provide copies of the raw data to each test function.
-
-    @pytest.fixture
-    def test_data(self, raw_data):
-        return json.loads(json.dumps(raw_data))
-
-    @pytest.fixture
-    def original_data(self, raw_data):
-        return json.loads(json.dumps(raw_data))
 
     def test_actors1(self, tmpdir, test_data, original_data):
         """Verify that we can create a json file for each actor and not recurse any further."""

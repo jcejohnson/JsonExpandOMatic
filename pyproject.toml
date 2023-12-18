@@ -65,3 +65,10 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: marks unit tests",
+    "jsonref: marks jsonref integration tests",
+    "pydantic: marks pydantic integration tests",
+]
