@@ -69,6 +69,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 markers = [
     "unit: marks unit tests",
+    "lazy: marks lazy-contraction tests",
     "jsonref: marks jsonref integration tests",
     "pydantic: marks pydantic integration tests",
 ]
