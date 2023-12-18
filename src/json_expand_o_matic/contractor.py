@@ -1,18 +1,15 @@
-import enum
 import json
 import os
-from dataclasses import dataclass
 from functools import partial
 from typing import Any, Dict, List, Union
 from urllib.parse import urlparse
 
-from peak.util.proxies import LazyProxy  # type: ignore[import-untyped]
-
-
-class ContractionProxy:
-    # Marker class for alternate contraction proxy implementations.
-    ...
-
+from .lazy_contractor import (
+    ContractionProxy,
+    ContractionProxyContext,
+    ContractionProxyState,
+    DefaultContractionProxy,
+)
 
 """
 from peak.util.proxies import get_callback  # type: ignore[import-untyped]
@@ -31,29 +28,6 @@ def json_dumps(*args, **kwargs):
         return json.dumps(*args, cls=ContractionProxyJSONEncoder, **kwargs)
     return json.dumps(*args, **kwargs)
 """
-
-
-class ContractionProxyState(enum.Enum):
-    waiting = 1
-    loading = 2
-    ready = 3
-
-
-class DefaultContractionProxy(LazyProxy, ContractionProxy):
-    def __init__(self, *, callback):
-        context: ContractionProxyContext = callback.keywords["context"]
-        assert context.state == ContractionProxyState.waiting
-        super().__init__(callback)
-
-
-@dataclass
-class ContractionProxyContext:
-    data: Any
-    parent_key: Any
-    parent: Union[list, dict]
-    path: str
-    value: Any
-    state: ContractionProxyState = ContractionProxyState.waiting
 
 
 class Contractor:
