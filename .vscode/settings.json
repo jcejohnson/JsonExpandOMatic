@@ -1,0 +1,27 @@
+{
+    "python.analysis.typeCheckingMode": "basic",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.insertSpaces": true,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+    },
+    "isort.args": [
+        "--profile",
+        "black"
+    ],
+    "black-formatter.args": [
+        "--line-length",
+        "119"
+    ],
+    "flake8.args": [
+        "--max-line-length",
+        "119"
+    ],
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.importFormat": "relative",
+    "python.autoComplete.extraPaths": []
+}

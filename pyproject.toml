@@ -1,5 +1,65 @@
 [build-system]
-# These are the assumed default build requirements from pip:
-# https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
-requires = ["setuptools>=40.8.0", "wheel"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "forgs"
+authors = [
+    { name = "James Johnson", email = "jcejohnson@users.noreply.github.com" },
+]
+description = "Expand a dict into a collection of subdirectories and json files or contract (un-expand) the output of expand() into a dict."
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = ["json", "jsonref"]
+license = { text = "Don't Be A Dick" }
+classifiers = [
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11"
+]
+dependencies = [
+    "ProxyTypes",
+
+    ## Misc
+    ## - typing_extensions - https://realpython.com/python-type-self/
+    "typing_extensions"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+jsonref = [
+    "jsonref"
+]
+pydantic = [
+    "pydantic <2"
+]
+dev = [
+    "autoflake",
+    "black",
+    "bump2version",
+    "coloredlogs",
+    "flake8",
+    "isort",
+    "jsonref",
+    "mypy",
+    "pandas-stubs",
+    "pep8-naming",
+    "pip-tools",
+    "pytest-cov",
+    "pytest-resource-path",
+    "pytest",
+    "Sphinx",
+    "tox"
+]
+
+[project.scripts]
+JsonExpandOMatic = "json_expand_o_matic.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -41,7 +41,7 @@ case ${self} in
     ;;
 
   wrapper.sh)
-    for thing in expand contract tox bumpversion ; do ln -vf ${self} ${thing}.sh ; done
+    for thing in expand contract ; do ln -vf ${self} ${thing}.sh ; done
     exit 0
     ;;
 esac

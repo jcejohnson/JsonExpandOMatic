@@ -36,13 +36,18 @@ Or use jsonref
 
 ## Quick Start
 
-Setup wrapper scripts:
+## Quick Start
 
-    ./wrapper.sh
+```bash
+# Create and activate the virtual environment
+python3.10 -m venv .venv
+source .venv/bin/activate
+# Configure the venv for development
+pip install -e .[dev]
+# Run the tests
+pytest tests
+```
 
-Install for development:
-
-    ./tox.sh
 
 Do a thing:
 
