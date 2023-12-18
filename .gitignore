@@ -16,7 +16,7 @@ build/
 dist/
 foo
 htmlcov/
-venv
+.venv
 
 # https://github.com/johnthagen/python-blueprint
 # This is what I used to stamp out the original project structure.
@@ -31,3 +31,4 @@ tox.sh
 # Our de-facto manual test output.
 output*
 log.txt
+.venv

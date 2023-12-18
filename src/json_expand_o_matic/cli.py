@@ -17,12 +17,12 @@ def usage():
 
 
 def main():
-    cmd = sys.argv[1]
-    argv = sys.argv[2:]
-
-    if not argv or sys.argv[2] == "--help" or "--help" in argv:
+    if len(sys.argv) < 3 or "--help" in sys.argv:
         usage()
         return
+
+    cmd = sys.argv[1]
+    argv = sys.argv[2:]
 
     if sys.argv[2] == "--version":
         print(VERSION)

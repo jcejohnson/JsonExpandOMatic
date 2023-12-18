@@ -1,10 +1,15 @@
 import json
 import os
 
-import jsonref  # type: ignore
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
+
+JSONREF = True
+try:
+    import jsonref  # type: ignore
+except Exception:
+    JSONREF = False
 
 
 class TestSimple:
@@ -109,10 +114,17 @@ class TestSimple:
         contracted = JsonExpandOMatic(path=tmpdir).contract(root_element="root")
         assert contracted == original_data
 
+
+    @pytest.mark.skipif(not JSONREF, reason="jsonref not available.")
+    def test_contract_with_jsonref(self, tmpdir, test_data, original_data):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+
         # Or we can use jsonref.load() to do the same.
         with open(f"{tmpdir}/root.json") as f:
             assert jsonref.load(f, base_uri=f"file://{tmpdir}/") == original_data
 
+    @pytest.mark.skipif(not JSONREF, reason="jsonref not available.")
     def test_jsonref(self, tmpdir, test_data, original_data, threaded):
         expanded = JsonExpandOMatic(path=tmpdir).expand(
             test_data, root_element="root", preserve=False, threaded=threaded

@@ -7,12 +7,14 @@ self=$(basename $0)
 # This supposedly makes pip faster in WSL.
 export DISPLAY=
 
+venv=${VENV:-.venv}
+
 if [ ! -d venv ] ; then
   (
     set -x
-    python3 -m venv venv
-    venv/bin/pip install --upgrade pip
-    venv/bin/pip install pip-tools
+    python3 -m venv ${venv}
+    ${venv}/bin/pip install --upgrade pip
+    ${venv}/bin/pip install pip-tools
   )
   # Force the `if` below to _not_ recomplie requirements*txt so that we
   #   use what the develop has explicitly requested in them.
