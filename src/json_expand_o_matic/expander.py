@@ -23,10 +23,14 @@ class Expander:
 
         # options will not include pool or zip options when called recursively.
         self.pool_options = {
-            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("pool_")}
+            # See ExpansionPool
+            key: self.options.pop(key)
+            for key in {key for key in self.options.keys() if key.startswith("pool_")}
         }
         self.zip_options = {
-            key: self.options.pop(key) for key in {key for key in self.options.keys() if key.startswith("zip_")}
+            # See ExpansionZipper
+            key: self.options.pop(key)
+            for key in {key for key in self.options.keys() if key.startswith("zip_")}
         }
 
         assert (
@@ -193,11 +197,12 @@ class Expander:
                 return self._dump(c)
 
             self._log(f">>> Expand children of [{c.raw}]")
-            self._recursion_instance(
-                path=os.path.dirname(self.path),
-                data={os.path.basename(self.path): self.data},
-                leaf_nodes=c.children,
-            )._execute(indent=self.indent + 2, my_path_component=os.path.basename(self.path), traversal="")
+            expander = self._recursion_instance(
+                path=os.path.dirname(self.path), data={os.path.basename(self.path): self.data}, leaf_nodes=c.children
+            )
+            expander._execute(
+                indent=self.indent + 2, my_path_component=os.path.basename(self.path), traversal="", work=self.work
+            )
             self._log(f"<<< Expand children of [{c.raw}]")
 
             return self._dump(c)
@@ -213,12 +218,8 @@ class Expander:
 
         path_component = str(key).replace(":", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
-        expander = Expander(
-            logger=self.logger,
-            path=os.path.join(self.path, path_component),
-            data=self.data[key],
-            leaf_nodes=self.leaf_nodes,
-            **self.options,
+        expander = self._recursion_instance(
+            path=os.path.join(self.path, path_component), data=self.data[key], leaf_nodes=self.leaf_nodes
         )
         self.data[key] = expander._execute(
             indent=self.indent + 2,
@@ -234,5 +235,10 @@ class Expander:
                 self.hashcodes[hashcode] += expander.hashcodes[hashcode]
             else:
                 self.hashcodes[hashcode] = expander.hashcodes[hashcode]
+
+    def _recursion_instance(self, *, path, data, leaf_nodes):  # key, path_component):
+        expander = Expander(logger=self.logger, path=path, data=data, leaf_nodes=leaf_nodes, **self.options)
+
+        return expander
 
         # self.data[key] = {"$ref": f"{self.my_path_component}/{path_component}.json"}

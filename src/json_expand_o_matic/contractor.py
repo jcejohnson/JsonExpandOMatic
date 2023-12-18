@@ -4,7 +4,7 @@ from functools import partial
 from typing import Any, Dict, List, Union
 from urllib.parse import urlparse
 
-from peak.util.proxies import LazyProxy
+from peak.util.proxies import LazyProxy  # type: ignore[import-untyped]
 
 
 class ContractionProxy:

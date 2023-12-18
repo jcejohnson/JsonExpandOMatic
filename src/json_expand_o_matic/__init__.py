@@ -31,6 +31,6 @@
 
 """
 
-from .expand_o_matic import JsonExpandOMatic
+from .expand_o_matic import JsonExpandOMatic  # pyright: ignore # noqa: F401
 
-VERSION = "v0.2.1"
+VERSION = "v0.3.0"

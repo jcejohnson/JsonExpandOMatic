@@ -50,8 +50,9 @@ with open(f'{data_path}/root.json') as f:
 # Create and activate the virtual environment
 python3.10 -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 # Configure the venv for development
-pip install -e .[dev]
+pip install -e .[all,dev]
 # Run the tests
 pytest tests
 ```

@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "forgs"
+name = "json_expand_o_matic"
 authors = [
     { name = "James Johnson", email = "jcejohnson@users.noreply.github.com" },
 ]
@@ -24,9 +24,13 @@ dependencies = [
     ## - typing_extensions - https://realpython.com/python-type-self/
     "typing_extensions"
 ]
+
 dynamic = ["version"]
 
 [project.optional-dependencies]
+all = [
+    "json_expand_o_matic[jsonref,pydantic]"
+]
 jsonref = [
     "jsonref"
 ]

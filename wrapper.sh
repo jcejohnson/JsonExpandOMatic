@@ -23,27 +23,27 @@ if [ ! -d venv ] ; then
   touch requirements.txt dev-requirements.in
 fi
 
-[ requirements.in -nt requirements.txt ] && venv/bin/pip-compile --resolver=backtracking requirements.in
-[ dev-requirements.in -nt dev-requirements.txt ] && venv/bin/pip-compile --resolver=backtracking dev-requirements.in
+[ requirements.in -nt requirements.txt ] && ${venv}/bin/pip-compile --resolver=backtracking requirements.in
+[ dev-requirements.in -nt dev-requirements.txt ] && ${venv}/bin/pip-compile --resolver=backtracking dev-requirements.in
 
-[ -x venv/bin/JsonExpandOMatic ] || (set -x ; venv/bin/pip install -e .)
+[ -x ${venv}/bin/JsonExpandOMatic ] || (set -x ; ${venv}/bin/pip install -e '.[all]')
 
 case ${self} in
 
   bumpversion.sh)
-    exec venv/bin/bumpversion "$@"
+    exec ${venv}/bin/bumpversion "$@"
     ;;
 
   tox.sh)
-    which tox >/dev/null || [ -x venv/bin/tox ] || (set -x ; venv/bin/pip install tox)
-    [ ! -x venv/bin/tox ] || exec venv/bin/tox "@"
+    which tox >/dev/null || [ -x ${venv}/bin/tox ] || (set -x ; ${venv}/bin/pip install tox)
+    [ ! -x ${venv}/bin/tox ] || exec ${venv}/bin/tox "$@"
     exec tox "$@"
     ;;
 
   wrapper.sh)
-    for thing in expand contract tox bumpversion ; do ln -vf ${self} ${thing}.sh ; done
+    for thing in expand contract ; do ln -vf ${self} ${thing}.sh ; done
     exit 0
     ;;
 esac
 
-exec venv/bin/JsonExpandOMatic "${self/.sh}" "$@"
+exec ${venv}/bin/JsonExpandOMatic "${self/.sh}" "$@"
