@@ -1,7 +1,8 @@
 import json
 import os
 from functools import partial
-from typing import Any, Dict, List, Union
+from logging import Logger
+from typing import Any, Dict, List, Type, Union
 from urllib.parse import urlparse
 
 from .lazy_contractor import (
@@ -9,6 +10,7 @@ from .lazy_contractor import (
     ContractionProxyContext,
     ContractionProxyState,
     DefaultContractionProxy,
+    DefaultContractionProxyContext,
 )
 
 """
@@ -33,19 +35,33 @@ def json_dumps(*args, **kwargs):
 class Contractor:
     """ """
 
-    def __init__(self, *, logger, path, root_element, **options):
+    def __init__(
+        self,
+        *,
+        logger: Logger,
+        path: str,
+        root_element: str,
+        lazy: bool = False,
+        ref_key: str = "$ref",
+        contraction_context_class: Type[ContractionProxyContext] = DefaultContractionProxyContext,
+        contraction_proxy_class: Type[ContractionProxy] = DefaultContractionProxy,
+        **options,
+    ):
         self.logger = logger
         self.path = path
+        self.ref_key = ref_key
         self.root_element = root_element
 
-        self.ref_key = options.get("ref_key", "$ref")
-        self.eager = not options.get("lazy", False)
-        self.contraction_proxy_class = options.get("contraction_proxy_class", DefaultContractionProxy)
+        self.lazy = lazy
+        self.contraction_context_class = contraction_context_class
+        self.contraction_proxy_class = contraction_proxy_class
 
-        if self.eager:
-            self._recursively_contract = self._eager_contraction
-        else:
+        if lazy:
+            assert self.contraction_context_class
+            assert self.contraction_proxy_class
             self._recursively_contract = self._lazy_contraction
+        else:
+            self._recursively_contract = self._eager_contraction
 
     def execute(self) -> Union[List[Any], Dict[Any, Any]]:
         root_data = self._slurp(self.path, f"{self.root_element}.json", parent=None)
@@ -53,7 +69,9 @@ class Contractor:
         assert not isinstance(result, ContractionProxy)
         return result
 
-    def _contract(self, *, path, data, parent, parent_key) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
+    def _contract(
+        self, *, path: List[str], data, parent, parent_key
+    ) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
         assert not isinstance(data, ContractionProxy)
 
         if isinstance(data, list):
@@ -72,34 +90,27 @@ class Contractor:
         return data
 
     def _eager_contraction(
-        self, *, path, value, data, parent, parent_key
+        self, *, path: List[str], value, data, parent, parent_key
     ) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
         data = self._slurp(*path, value, parent=data)
         return self._contract(path=path + [os.path.dirname(value)], data=data, parent=parent, parent_key=parent_key)
 
-    def _lazy_contraction(self, *, path, data, parent, parent_key, value):
-        context = ContractionProxyContext(path=path, value=value, data=data, parent=parent, parent_key=parent_key)
-        callback = partial(self._lazy_delayed_contraction, context=context)
-        proxy = self.contraction_proxy_class(callback=callback)
-        return proxy
-
-    def _lazy_delayed_contraction(
-        self, *, context: ContractionProxyContext
+    def _lazy_contraction(
+        self, *, path: List[str], value, data, parent, parent_key
     ) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
-        assert context.state == ContractionProxyState.waiting
-        context.state = ContractionProxyState.loading
-        lazy_data = self._eager_contraction(
-            data=context.data,
-            parent_key=context.parent_key,
-            parent=context.parent,
-            path=context.path,
-            value=context.value,
+        context = self.contraction_context_class(
+            contractor=self,
+            path=path,
+            value=value,
+            data=data,
+            parent=parent,
+            parent_key=parent_key,
+            contraction_proxy_class=self.contraction_proxy_class,
         )
-        # Replace the ContractionProxy instance with the lazy-loaded data.
-        context.parent[context.parent_key] = lazy_data
-        context.state = ContractionProxyState.ready
-        assert not isinstance(lazy_data, ContractionProxy)
-        return lazy_data
+        # Request a proxy object that will delegate to _eager_contraction() when
+        # any attributes, methods, etc. are requested.
+        proxy = context.proxy()
+        return proxy
 
     def _slurp(self, *args, parent) -> Union[List[Any], Dict[Any, Any]]:
         with open(os.path.join(*args)) as f:

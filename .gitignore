@@ -32,3 +32,5 @@ tox.sh
 output*
 log.txt
 .venv
+
+tests/testresources/root*

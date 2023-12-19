@@ -101,4 +101,6 @@ class TestSimple(Fixtures):
         # We can use JsonExpandOMatic() to load the expanded data from the filesystem.
         # Note that this returns the original data exactly, the `root` wrapper is removed.
         contracted = JsonExpandOMatic(path=tmpdir).contract(root_element="root")
+
         assert contracted == original_data
+        assert json.dumps(contracted) == json.dumps(original_data)
