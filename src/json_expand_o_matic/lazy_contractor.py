@@ -40,7 +40,8 @@ app_func_2
 
 class ContractionProxy:
     # Marker class for alternate contraction proxy implementations.
-    ...
+    def __init__(self, *, callback):
+        raise NotImplementedError()
 
 
 class ContractionProxyState(enum.Enum):

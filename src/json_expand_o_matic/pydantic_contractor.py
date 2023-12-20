@@ -66,7 +66,10 @@ class LazyBaseThing(GenericPydanticBaseModel, Generic[T]):
     @property
     def data(self) -> T:
         if not self._data:
-            assert self.ctx
+            assert self.ctx, (
+                "Missing PydanticContractionProxyContext identifier. "
+                "Did you forget to use PydanticContractionProxy* objects during contract()?"
+            )
             context = PydanticContractionProxyContext.context_cache[self.ctx]
             raw_data = context._contract_now()
             raw_data = self._pre_parse_obj_as(context, raw_data)
@@ -92,7 +95,8 @@ class LazyBaseModel(LazyBaseThing[T], Generic[T]):
 
     def _post_parse_obj_as(self, context: PydanticContractionProxyContext, raw_data):
         # Replace the lazy model instance in the container.
-        self._container[context.parent_key] = self._data
+        if self._container is not None:
+            self._container[context.parent_key] = self._data
         return
 
 

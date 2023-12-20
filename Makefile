@@ -14,7 +14,8 @@ help:
 
 checkpoint:  ## git add -u ; git commit -m "checkpoint"
 	@ [ -d .tox/fmt ] && tox -e fmt || :
-	git add -u ; git commit -m "checkpoint"
+	@MESSAGE_="$(MESSAGE)" ; MESSAGE=$${MESSAGE:-checkpoint} ; \
+	set -x ; git add -u ; git commit -m "$${MESSAGE}"
 
 clean:  ## Remove .tox, htmlcov, etc...
 	@echo "clean .coverage .tox htmlcov .mypy_cache .pytest_cache, tests//*.egg-info, tests//__pycache__"

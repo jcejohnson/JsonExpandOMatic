@@ -1,6 +1,5 @@
 import json
 import os
-from functools import partial
 from logging import Logger
 from typing import Any, Dict, List, Type, Union
 from urllib.parse import urlparse
@@ -8,7 +7,6 @@ from urllib.parse import urlparse
 from .lazy_contractor import (
     ContractionProxy,
     ContractionProxyContext,
-    ContractionProxyState,
     DefaultContractionProxy,
     DefaultContractionProxyContext,
 )

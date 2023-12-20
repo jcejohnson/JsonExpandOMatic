@@ -11,7 +11,15 @@ from json_expand_o_matic.pydantic_contractor import (
 )
 
 from .fixtures import Fixtures
-from .model import Actor, LazyActor, LazyActorDict, LazyBaseModel, LazyDict, Model
+from .model import (
+    Actor,
+    LazyActor,
+    LazyActorDict,
+    LazyBaseModel,
+    LazyDict,
+    LessLazyModel,
+    VeryLazyModel,
+)
 
 PYDANTIC = True
 try:
@@ -30,7 +38,7 @@ class TestPydantic(Fixtures):
     def test_model(self, test_data, original_data):
         assert "actors" in test_data
 
-        instance = Model.parse_obj(test_data)
+        instance = VeryLazyModel.parse_obj(test_data)
         assert instance
 
         assert json.dumps(original_data, sort_keys=True, indent=0) == instance.json(
@@ -46,7 +54,7 @@ class TestPydantic(Fixtures):
         contracted = JsonExpandOMatic(path=tmpdir).contract(root_element="root")
         assert contracted == original_data
 
-        instance = Model.parse_obj(contracted)
+        instance = VeryLazyModel.parse_obj(contracted)
         assert instance
 
         assert json.dumps(original_data, sort_keys=True, indent=0) == instance.json(
@@ -55,7 +63,15 @@ class TestPydantic(Fixtures):
 
     @pytest.mark.lazy
     def test_lazy_root(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
+        #
+
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            json_dump_kwargs={"indent": 2, "sort_keys": True},
+            leaf_nodes=LessLazyModel.EXPANSION_RULES,
+        )
         assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
 
         expanded = cast(Dict[str, Dict[str, str]], expanded)
@@ -64,15 +80,39 @@ class TestPydantic(Fixtures):
         with open(root) as f:
             data = json.load(f)
 
-        data["actors"]["$ctx"] = 0
+        # data["actors"]["$ctx"] = 0
+        # LazyBaseModel requires a $ctx
+        # That is handled by the custom context & proxy but we have to cheat here.
+        for subdata in data.values():
+            if "$ref" in subdata:
+                subdata["$ctx"] = 0
+                continue
+            for subsubdata in subdata.values():
+                if "$ref" in subsubdata:
+                    subsubdata["$ctx"] = 0
 
-        instance = Model.parse_obj(data)
-        assert isinstance(instance, Model)
-        assert isinstance(instance.actors, LazyActorDict)
+        instance = LessLazyModel.parse_obj(data)
+        assert isinstance(instance, LessLazyModel)
+        assert isinstance(instance.actors, dict)
 
-        assert list(expanded.keys())[0] == root.stem  # i.e. -- "root"
-        assert instance.actors.ref == f"{root.stem}/actors.json"  # i.e. -- "root/actors.json"
-        assert instance.actors.ctx == 0
+        for key, actor in instance.actors.items():
+            assert isinstance(actor, LazyActor), key
+
+        actors = instance.actors
+
+        # At this point actors["charlie_chaplin"] is a lazy object
+        charlie_chaplin = actors["charlie_chaplin"]
+        assert isinstance(charlie_chaplin, LazyActor)
+
+        # This will trigger the lazy load but that will fail because we loaded
+        # the data directly rather than using contract() and therefore the
+        # LazyActor does not have a PydanticContractionProxyContext that it can
+        # use to load the actual data.
+        try:
+            assert charlie_chaplin.first_name == "Charlie"
+            assert False, "BUG"
+        except AssertionError:
+            ...
 
     @pytest.mark.lazy
     def test_lazy_load(self, tmpdir, test_data, original_data):
@@ -89,11 +129,11 @@ class TestPydantic(Fixtures):
             contraction_proxy_class=PydanticContractionProxy,
         )
 
-        instance = Model.parse_obj(contracted)
+        instance = VeryLazyModel.parse_obj(contracted)
 
         assert issubclass(LazyActorDict, LazyDict)
 
-        assert isinstance(instance, Model)
+        assert isinstance(instance, VeryLazyModel)
         assert isinstance(instance.actors, LazyActorDict)
 
         assert instance.actors.ref == f"{root.stem}/actors.json"
@@ -111,6 +151,7 @@ class TestPydantic(Fixtures):
         # print(key)
 
         lst = list(actors.keys())  # This triggers actors.__iter__
+        assert lst
 
         assert issubclass(LazyActor, LazyBaseModel)
 
@@ -135,5 +176,9 @@ class TestPydantic(Fixtures):
         assert isinstance(contracted["actors"], dict)
         assert "charlie_chaplin" not in contracted["actors"]
         assert "$ref" in contracted["actors"]
+
+        # FIXME: Exercise LazyList
+        # FIXME: Exercise model.dict() -- should load everything
+        # FIXME: Exercise model.json() -- should not load everything
 
         ...

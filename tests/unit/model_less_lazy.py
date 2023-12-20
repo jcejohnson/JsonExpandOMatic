@@ -1,26 +1,30 @@
 """
-Lazy loading for fully expanded data.
+Less lazy loading for semi-expanded data.
 
-Every non-atomic attribute is expected to be its own file.
-Compatible with default expansion rules.
-Uses LazyBaseModel, LazyDict and LazyList.
+Every non-atomic attribute that is also not a list or dict is
+expected to be its own file.
+Requires custom expansion rules to create the necessary files.
+Uses LazyBaseModel.
+Does not use LazyDict and LazyList.
 
 Expected expansion layout:
 
+  Entries preceeded wit '-' represent a list or dict and should
+  not be present.
+
     root/actors/charlie_chaplin.json
-    root/actors/charlie_chaplin/filmography.json
-    ...
+  - root/actors/charlie_chaplin/filmography.json
     root/actors/charlie_chaplin/filmography/0.json
     ...
-    root/actors/charlie_chaplin/movies.json
+  - root/actors/charlie_chaplin/movies.json
     root/actors/charlie_chaplin/movies/modern_times.json
-    root/actors/charlie_chaplin/spouses.json
+  - root/actors/charlie_chaplin/spouses.json
     root/actors/charlie_chaplin/spouses/lita_grey.json
-    root/actors/charlie_chaplin/spouses/lita_grey/children.json
+  - root/actors/charlie_chaplin/spouses/lita_grey/children.json
     ...
     root/actors/dwayne_johnson.json
     ...
-    root/actors.json
+  - root/actors.json
     root.json
 """
 
@@ -29,7 +33,7 @@ from typing import Any, ClassVar, Dict, List, Type, Union
 from pydantic import BaseModel as PydanticBaseModel  # type: ignore
 from pydantic import Field  # type: ignore
 
-from json_expand_o_matic.pydantic_contractor import LazyBaseModel, LazyDict, LazyList
+from json_expand_o_matic.pydantic_contractor import LazyBaseModel
 
 try:
     # Fails for python < 3.10
@@ -60,13 +64,7 @@ class LazyFilm(LazyBaseModel):
 
 
 AnyFilm: TypeAlias = Union[LazyFilm, Film]
-
-
-class LazyFilmList(LazyList[AnyFilm]):
-    _model_clazz: Type[list] = List[AnyFilm]
-
-
-FilmsList: TypeAlias = Union[LazyFilmList, List[AnyFilm]]
+FilmsList: TypeAlias = List[AnyFilm]
 
 
 class Hobby(PydanticBaseModel):
@@ -87,22 +85,8 @@ class LazyMovie(LazyBaseModel):
 
 
 AnyMovie: TypeAlias = Union[LazyMovie, Movie]
-
-
-class LazyMovieList(LazyList[AnyMovie]):
-    _model_clazz: Type[list] = List[AnyMovie]
-
-
-MoviesList: TypeAlias = Union[LazyMovieList, List[AnyMovie]]
-
-
-class LazyMovieDict(LazyDict[str, AnyMovie]):
-    _model_clazz: Type[dict] = Dict[str, AnyMovie]
-
-
-MoviesDict: TypeAlias = Union[LazyMovieDict, Dict[str, AnyMovie]]
-
-
+MoviesList: TypeAlias = List[AnyMovie]
+MoviesDict: TypeAlias = Dict[str, AnyMovie]
 MoviesCollection: TypeAlias = Union[MoviesDict, MoviesList]
 
 
@@ -117,13 +101,7 @@ class LazySpouse(LazyBaseModel):
 
 
 AnySpouse: TypeAlias = Union[LazySpouse, Spouse]
-
-
-class LazySpouseDict(LazyDict[str, AnySpouse]):
-    _model_clazz: Type[dict] = Dict[str, AnySpouse]
-
-
-SpousesDict: TypeAlias = Union[LazySpouseDict, Dict[str, AnySpouse]]
+SpousesDict: TypeAlias = Dict[str, AnySpouse]
 
 
 class Actor(PydanticBaseModel):
@@ -144,21 +122,7 @@ class LazyActor(LazyBaseModel):
 
 
 AnyActor: TypeAlias = Union[LazyActor, Actor]
-
-
-class LazyActorDict(LazyDict[str, AnyActor]):
-    _model_clazz: Type[dict] = Dict[str, AnyActor]
-
-
-ActorsDict: TypeAlias = Union[LazyActorDict, Dict[str, AnyActor]]
-
-
-class VeryLazyModel(PydanticBaseModel):
-    actors: ActorsDict
-
-    # Default expansion rules creates separate files for each attribute
-    # that is a list or dict.
-    EXPANSION_RULES: ClassVar[list] = []
+ActorsDict: TypeAlias = Dict[str, AnyActor]
 
 
 class LessLazyModel(PydanticBaseModel):
