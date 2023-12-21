@@ -2,6 +2,8 @@ import collections
 import hashlib
 import json
 import os
+from pathlib import Path
+from typing import cast
 
 from .leaf_node import LeafNode
 
@@ -114,8 +116,16 @@ class Expander:
         if self._is_leaf_node(LeafNode.When.BEFORE):
             return self.data
 
+        # if self._is_leaf_node(LeafNode.When.AFTER):
+        #     print(self.data)
+        #     breakpoint()
+
         for key in self._data_iter():
             self._recursively_expand(key=key)
+
+        # if self._is_leaf_node(LeafNode.When.AFTER):
+        #     print(self.data)
+        #     breakpoint()
 
         if self._is_leaf_node(LeafNode.When.AFTER):
             return self.data
@@ -149,8 +159,38 @@ class Expander:
         Always returns True so that _is_leaf_node() is less gross.
         """
 
-        if leaf_node and not leaf_node.WHAT == LeafNode.What.DUMP:
-            return True
+        if leaf_node:
+            if leaf_node.WHAT == LeafNode.What.INCLUDE:
+                if leaf_node.WHEN == LeafNode.When.AFTER:
+                    #
+                    # This is triggered by:
+                    #   "A<:/root/actors/[^/]+/filmography"
+                    #
+                    # In this scenario the contents of what would have been filmography.json
+                    # is included in the <actor>.json file under the <actor> key.
+                    # self.data at this point still expects that to be the case so its $ref
+                    # elements are written relative to <actor> rather than `actors`. To make
+                    # jsonref work we need to prefix $ref to make it relative to `actors`.
+                    #
+                    # self.path = "/path/to/root/actors/charlie_chaplin/filmography"
+                    #
+                    # self.data = [ {"$ref": "filmography/0.json"} ... ]
+                    #                         ^--- becomes --v
+                    # self.data = [ {"$ref": "charlie_chaplin/filmography/0.json"} ... ]
+                    #
+                    fq_path = Path(self.path)  # /path/to/root/actors/charlie_chaplin/filmography
+                    fq_path_name = fq_path.name  # filmography
+                    for key in self._data_iter():
+                        assert isinstance(self.data[key], dict)  # FIXME: This may not be valid. Testing required.
+                        value = cast(dict, self.data[key])  # value = {"$ref": "filmography/0.json"}
+                        data_path = value.get(self.ref_key)  # data_path = "filmography/0.json"
+                        assert data_path
+                        if fq_path_name == Path(data_path).parent.name:
+                            value[self.ref_key] = str(Path(fq_path.parent.name, data_path))
+
+                return True
+
+            assert leaf_node.WHAT == LeafNode.What.DUMP
 
         dumps = json.dumps(self.data, **self.json_dump_kwargs)
 

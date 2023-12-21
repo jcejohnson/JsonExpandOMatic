@@ -43,11 +43,19 @@ except Exception:
 
 
 class CastMember(PydanticBaseModel):
+    """
+    /root/actors/[^/]+/movies/[^/]+/cast/[^/]+
+    """
+
     actor: str
     name: str
 
 
 class Film(PydanticBaseModel):
+    """
+    /root/actors/[^/]+/filmography/[^/]+
+    """
+
     __root__: List[Any]
 
     # https://docs.pydantic.dev/usage/models/#custom-root-types
@@ -68,16 +76,24 @@ FilmsList: TypeAlias = List[AnyFilm]
 
 
 class Hobby(PydanticBaseModel):
+    """
+    /root/actors/[^/]+/hobbies/[^/]+
+    """
+
     name: str
 
 
 class Movie(PydanticBaseModel):
+    """
+    /root/actors/[^/]+/movies/[^/]+
+    """
+
     budget: int = 0
     run_time_minutes: int = 0
     title: str
     year: int = 0
 
-    cast: Dict[str, CastMember] = Field(default_factory=dict)
+    cast: Dict[str, CastMember] = Field(default_factory=dict, description="/root/actors/[^/]+/movies/[^/]+/cast")
 
 
 class LazyMovie(LazyBaseModel):
@@ -91,9 +107,13 @@ MoviesCollection: TypeAlias = Union[MoviesDict, MoviesList]
 
 
 class Spouse(PydanticBaseModel):
+    """
+    /root/actors/[^/]+/spouses/[^/]+
+    """
+
     first_name: str
     last_name: str
-    children: List[str] = Field(default_factory=list)
+    children: List[str] = Field(default_factory=list, description="/root/actors/[^/]+/spouses/[^/]+/children")
 
 
 class LazySpouse(LazyBaseModel):
@@ -105,16 +125,20 @@ SpousesDict: TypeAlias = Dict[str, AnySpouse]
 
 
 class Actor(PydanticBaseModel):
+    """
+    /root/actors/[^/]+
+    """
+
     birth_year: int = 0
     first_name: str
     last_name: str
     is_funny: bool = False
 
-    filmography: FilmsList = Field(default_factory=list)
-    movies: MoviesCollection
+    filmography: FilmsList = Field(default_factory=list, description="/root/actors/[^/]+/filmography")
+    movies: MoviesCollection = Field(..., description="/root/actors/[^/]+/movies")
 
-    hobbies: Dict[str, Hobby] = Field(default_factory=dict)
-    spouses: SpousesDict = Field(default_factory=dict)
+    hobbies: Dict[str, Hobby] = Field(default_factory=dict, description="/root/actors/[^/]+/hobies")
+    spouses: SpousesDict = Field(default_factory=dict, description="/root/actors/[^/]+/spouses")
 
 
 class LazyActor(LazyBaseModel):
@@ -135,27 +159,51 @@ class LessLazyModel(PydanticBaseModel):
     Because we are not using a LazyDict, the LazyActor instances will not
     be able to replace themselves in AlternateModel.actors after creating
     the non-lazy Actor instances.
+
+    /root
     """
 
-    actors: Dict[str, AnyActor]
+    actors: Dict[str, AnyActor] = Field(..., description="/root/actors")
 
     EXPANSION_RULES: ClassVar[list] = [
-        # Create a file per actor before recursing into it.
-        # All four of these rules will accomplish the same thing.
-        # The 3rd & 4th work because they match /root/actors/someone before
-        # recursing into "someone's" attributes.
-        "B>:/root/actors/.*",
-        # "B>:/root/actors/.*$",
-        # "B>:/root/actors/[^/]+",
-        # "B>:/root/actors/[^/]+$",
+        "B>:/root/actors/[^/]+/filmography/.*",  # Create a file per film
+        "A<:/root/actors/[^/]+/filmography",  # Eliminate filmography.json
         #
-        # Create a file per actor after recursing into it. Because this is
-        # done after recursion files are also created for each nested object.
-        # This is default behavior so we don't need to include it.
-        # "A>:/root/actors/[^/]+$",
+        "B>:/root/actors/[^/]+/hobbies/.*",  # Create a file per hobby
+        "A<:/root/actors/[^/]+/hobbies",  # Eliminate hobbies.json
         #
-        # After recursing into the actors dict, slurp what would have been
-        # actors.json into root.json. This is what allows us to declare
-        # AlternateModel.actors as a regular dict instead of a LazyDict.
-        "A<:/root/actors",
+        "B>:/root/actors/[^/]+/movies/[^/]+/cast/.*",  # Create a file per cast member
+        "A<:/root/actors/[^/]+/movies/[^/]+/cast",  # Eliminate cast.json
+        "A>:/root/actors/[^/]+/movies/.*",  # Create a file per movie. Note `A>`
+        "A<:/root/actors/[^/]+/movies",  # Eliminate movies.json
+        #
+        "B>:/root/actors/[^/]+/spouses/[^/]+/children/.*",  # Create a file per child
+        "A<:/root/actors/[^/]+/spouses/[^/]+/children",  # Eliminate children.json
+        "A>:/root/actors/[^/]+/spouses/.*",  # Create a file per movie. Note `A>`
+        "A<:/root/actors/[^/]+/spouses",  # Eliminate spouses.json
+        #
+        "A>:/root/actors/.*",  # Create a file per actor. Note `A>`
+        "A<:/root/actors",  # Eliminate actors.json
+        #
+        # Notes:
+        #   `A>` - is used to create a "file per foo" when you want some of foo's
+        #          attributes to have been put into their own files. Using `B>`
+        #          instead would prevent recursion and cause all of foo's data to
+        #          be included in foo's file.
     ]
+
+    Actor: ClassVar[Type] = Actor
+    ActorsDict: ClassVar[Type] = ActorsDict
+    CastMember: ClassVar[Type] = CastMember
+    Film: ClassVar[Type] = Film
+    FilmsList: ClassVar[Type] = FilmsList
+    Hobby: ClassVar[Type] = Hobby
+    LazyActor: ClassVar[Type] = LazyActor
+    LazyFilm: ClassVar[Type] = LazyFilm
+    LazyMovie: ClassVar[Type] = LazyMovie
+    LazySpouse: ClassVar[Type] = LazySpouse
+    Movie: ClassVar[Type] = Movie
+    MoviesDict: ClassVar[Type] = MoviesDict
+    MoviesList: ClassVar[Type] = MoviesList
+    Spouse: ClassVar[Type] = Spouse
+    SpousesDict: ClassVar[Type] = SpousesDict

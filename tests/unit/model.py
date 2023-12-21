@@ -9,7 +9,6 @@ Expected expansion layout:
 
     root/actors/charlie_chaplin.json
     root/actors/charlie_chaplin/filmography.json
-    ...
     root/actors/charlie_chaplin/filmography/0.json
     ...
     root/actors/charlie_chaplin/movies.json
@@ -160,38 +159,18 @@ class VeryLazyModel(PydanticBaseModel):
     # that is a list or dict.
     EXPANSION_RULES: ClassVar[list] = []
 
-
-class LessLazyModel(PydanticBaseModel):
-    """
-    Define an alternate root-level model that doesn't require a LazyDict.
-
-    This requires that the 'actors' element in .../root.json is a dict of
-    LazyBaseThing and not a LazyBaseThing itself.
-
-    Because we are not using a LazyDict, the LazyActor instances will not
-    be able to replace themselves in AlternateModel.actors after creating
-    the non-lazy Actor instances.
-    """
-
-    actors: Dict[str, AnyActor]
-
-    EXPANSION_RULES: ClassVar[list] = [
-        # Create a file per actor before recursing into it.
-        # All four of these rules will accomplish the same thing.
-        # The 3rd & 4th work because they match /root/actors/someone before
-        # recursing into "someone's" attributes.
-        "B>:/root/actors/.*",
-        # "B>:/root/actors/.*$",
-        # "B>:/root/actors/[^/]+",
-        # "B>:/root/actors/[^/]+$",
-        #
-        # Create a file per actor after recursing into it. Because this is
-        # done after recursion files are also created for each nested object.
-        # This is default behavior so we don't need to include it.
-        # "A>:/root/actors/[^/]+$",
-        #
-        # After recursing into the actors dict, slurp what would have been
-        # actors.json into root.json. This is what allows us to declare
-        # AlternateModel.actors as a regular dict instead of a LazyDict.
-        "A<:/root/actors",
-    ]
+    Actor: ClassVar[Type] = Actor
+    CastMember: ClassVar[Type] = CastMember
+    Film: ClassVar[Type] = Film
+    Hobby: ClassVar[Type] = Hobby
+    LazyActor: ClassVar[Type] = LazyActor
+    LazyActorDict: ClassVar[Type] = LazyActorDict
+    LazyFilm: ClassVar[Type] = LazyFilm
+    LazyFilmList: ClassVar[Type] = LazyFilmList
+    LazyMovie: ClassVar[Type] = LazyMovie
+    LazyMovieDict: ClassVar[Type] = LazyMovieDict
+    LazyMovieList: ClassVar[Type] = LazyMovieList
+    LazySpouse: ClassVar[Type] = LazySpouse
+    LazySpouseDict: ClassVar[Type] = LazySpouseDict
+    Movie: ClassVar[Type] = Movie
+    Spouse: ClassVar[Type] = Spouse

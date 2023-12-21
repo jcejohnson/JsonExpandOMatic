@@ -6,20 +6,15 @@ import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
 from json_expand_o_matic.pydantic_contractor import (
+    LazyBaseModel,
+    LazyDict,
     PydanticContractionProxy,
     PydanticContractionProxyContext,
 )
 
 from .fixtures import Fixtures
-from .model import (
-    Actor,
-    LazyActor,
-    LazyActorDict,
-    LazyBaseModel,
-    LazyDict,
-    LessLazyModel,
-    VeryLazyModel,
-)
+from .model import LazyActorDict, VeryLazyModel
+from .model_less_lazy import LessLazyModel
 
 PYDANTIC = True
 try:
@@ -80,7 +75,6 @@ class TestPydantic(Fixtures):
         with open(root) as f:
             data = json.load(f)
 
-        # data["actors"]["$ctx"] = 0
         # LazyBaseModel requires a $ctx
         # That is handled by the custom context & proxy but we have to cheat here.
         for subdata in data.values():
@@ -96,13 +90,13 @@ class TestPydantic(Fixtures):
         assert isinstance(instance.actors, dict)
 
         for key, actor in instance.actors.items():
-            assert isinstance(actor, LazyActor), key
+            assert isinstance(actor, LessLazyModel.LazyActor), key
 
         actors = instance.actors
 
         # At this point actors["charlie_chaplin"] is a lazy object
         charlie_chaplin = actors["charlie_chaplin"]
-        assert isinstance(charlie_chaplin, LazyActor)
+        assert isinstance(charlie_chaplin, LessLazyModel.LazyActor)
 
         # This will trigger the lazy load but that will fail because we loaded
         # the data directly rather than using contract() and therefore the
@@ -153,22 +147,22 @@ class TestPydantic(Fixtures):
         lst = list(actors.keys())  # This triggers actors.__iter__
         assert lst
 
-        assert issubclass(LazyActor, LazyBaseModel)
+        assert issubclass(VeryLazyModel.LazyActor, LazyBaseModel)
 
         # At this point actors["charlie_chaplin"] is a lazy object
         charlie_chaplin = actors["charlie_chaplin"]
-        assert isinstance(charlie_chaplin, LazyActor)
+        assert isinstance(charlie_chaplin, VeryLazyModel.LazyActor)
 
         # This will trigger the lazy load.
         assert charlie_chaplin.first_name == "Charlie"
         # Our local charlie_chaplin variable hasn't changed but
         # LazyBaseModel has replaced itself in the LazyDict that contains it.
-        assert isinstance(charlie_chaplin, LazyActor)
-        assert isinstance(actors["charlie_chaplin"], Actor)
+        assert isinstance(charlie_chaplin, VeryLazyModel.LazyActor)
+        assert isinstance(actors["charlie_chaplin"], VeryLazyModel.Actor)
 
         # Refresh our local copy from the lazy dict
         charlie_chaplin = actors["charlie_chaplin"]
-        assert isinstance(charlie_chaplin, Actor)
+        assert isinstance(charlie_chaplin, VeryLazyModel.Actor)
 
         # Verify that the original data returned by contract()
         # has not been mutated by the pydantic bits.
@@ -180,5 +174,34 @@ class TestPydantic(Fixtures):
         # FIXME: Exercise LazyList
         # FIXME: Exercise model.dict() -- should load everything
         # FIXME: Exercise model.json() -- should not load everything
+
+        ...
+
+    @pytest.mark.lazy
+    def test_less_lazy_load(self, tmpdir, test_data, original_data):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            leaf_nodes=LessLazyModel.EXPANSION_RULES,
+        )
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+
+        # breakpoint()
+
+        expanded = cast(Dict[str, Dict[str, str]], expanded)
+        root = pathlib.Path(tmpdir.dirname, expanded["root"]["$ref"])
+        assert root
+
+        contracted = JsonExpandOMatic(path=tmpdir).contract(
+            root_element="root",
+            lazy=True,
+            contraction_context_class=PydanticContractionProxyContext,
+            contraction_proxy_class=PydanticContractionProxy,
+        )
+
+        # breakpoint()
+        instance = LessLazyModel.parse_obj(contracted)
+        assert instance
 
         ...
