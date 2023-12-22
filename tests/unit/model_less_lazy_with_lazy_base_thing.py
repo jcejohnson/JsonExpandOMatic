@@ -28,6 +28,7 @@ Expected expansion layout:
     root.json
 """
 
+from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, List, Type, Union
 
 from pydantic import BaseModel as PydanticBaseModel  # type: ignore
@@ -129,6 +130,9 @@ class Actor(PydanticBaseModel):
     /root/actors/[^/]+
     """
 
+    class Config:
+        arbitrary_types_allowed = True
+
     birth_year: int = 0
     first_name: str
     last_name: str
@@ -141,6 +145,7 @@ class Actor(PydanticBaseModel):
     spouses: SpousesDict = Field(default_factory=dict, description="/root/actors/[^/]+/spouses")
 
 
+@dataclass
 class LazyActor(LazyBaseModel):
     _model_clazz: Type[PydanticBaseModel] = Actor
 
@@ -162,6 +167,9 @@ class LessLazyModel(PydanticBaseModel):
 
     /root
     """
+
+    class Config:
+        arbitrary_types_allowed = True
 
     actors: Dict[str, AnyActor] = Field(..., description="/root/actors")
 

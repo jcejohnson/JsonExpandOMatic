@@ -56,47 +56,12 @@ class CountingContractionProxyContext(DefaultContractionProxyContext):
         return super()._delayed_contraction()
 
 
-"""
-@dataclass
-class CustomContractionProxy(LazyProxy, ContractionProxy):
-    #
-
-    COUNTER: ClassVar[int] = 0
-
-    def __init__(self, *, callback):
-        def custom_callback(*args, **kwargs):
-            print("CALLBACK")
-            CustomContractionProxy.COUNTER += 1
-            return callback(*args, **kwargs)
-
-        LazyProxy.__init__(self, custom_callback)
-"""
-
 simple_test_data = {
     "people": {
         "fred": {"first_name": "fred", "last_name": "flintstone"},
         "barney": {"first_name": "barney", "last_name": "rubble"},
     }
 }
-
-"""
-def recursively_compare(a, b):
-    if isinstance(a, dict):
-        if a.keys() != b.keys():
-            return False
-        for key in a.keys():
-            if not recursively_compare(a[key], b[key]):
-                return False
-        return True
-    if isinstance(a, list):
-        if len(a) != len(b):
-            return False
-        for key, _ in enumerate(a):
-            if not recursively_compare(a[key], b[key]):
-                return False
-        return True
-    return a == b
-"""
 
 
 @pytest.mark.unit
@@ -108,9 +73,8 @@ class TestLazy(Fixtures):
         # Assert that independent copies of the raw data are equivalent.
         assert test_data == original_data
 
-    def test_default_proxy_1(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
-        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+    def test_default_proxy_1(self, original_data, default_expansion):
+        tmpdir = default_expansion.pop("$tmpdir")
 
         # We can use JsonExpandOMatic() to load the expanded data from the filesystem.
         # Note that this returns the original data exactly, the `root` wrapper is removed.
@@ -148,9 +112,8 @@ class TestLazy(Fixtures):
         isinstance(contracted["actors"]["charlie_chaplin"], ContractionProxy)
         isinstance(contracted["actors"]["charlie_chaplin"]["filmography"], ContractionProxy)
 
-    def test_default_proxy_2(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
-        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+    def test_default_proxy_2(self, original_data, default_expansion):
+        tmpdir = default_expansion.pop("$tmpdir")
 
         contracted = JsonExpandOMatic(path=tmpdir).contract(root_element="root", lazy=True)
 
@@ -168,9 +131,8 @@ class TestLazy(Fixtures):
 
         # Everything else is identical to test_default_proxy_1
 
-    def test_default_proxy_3(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
-        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+    def test_default_proxy_3(self, original_data, default_expansion):
+        tmpdir = default_expansion.pop("$tmpdir")
 
         contracted = JsonExpandOMatic(path=tmpdir).contract(root_element="root", lazy=True)
 
@@ -190,9 +152,8 @@ class TestLazy(Fixtures):
 
         # Everything else is identical to test_default_proxy_1
 
-    def test_triggers(self, tmpdir, test_data, original_data):
-        expanded = JsonExpandOMatic(path=tmpdir).expand(test_data, root_element="root", preserve=False)
-        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+    def test_triggers(self, default_expansion):
+        tmpdir = default_expansion.pop("$tmpdir")
 
         reset_counters()
 

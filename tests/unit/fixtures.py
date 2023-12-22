@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from json_expand_o_matic import JsonExpandOMatic
+
 
 def idfn(fixture_value):
     # ID Function for expander_options fixture.
@@ -64,3 +66,14 @@ class Fixtures:
     @pytest.fixture
     def original_data(self, raw_data):
         return json.loads(json.dumps(raw_data))
+
+    @pytest.fixture(scope="function")
+    def default_expansion(self, tmpdir, test_data):
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            json_dump_kwargs={"indent": 2, "sort_keys": True},
+        )
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+        assert isinstance(expanded, dict)
+        expanded["$tmpdir"] = tmpdir
+        return expanded

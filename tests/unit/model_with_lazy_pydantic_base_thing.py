@@ -28,7 +28,11 @@ from typing import Any, ClassVar, Dict, List, Type, Union
 from pydantic import BaseModel as PydanticBaseModel  # type: ignore
 from pydantic import Field  # type: ignore
 
-from json_expand_o_matic.pydantic_contractor import LazyBaseModel, LazyDict, LazyList
+from json_expand_o_matic.pydantic_contractor import (
+    LazyPydanticBaseModel,
+    LazyPydanticDict,
+    LazyPydanticList,
+)
 
 try:
     # Fails for python < 3.10
@@ -54,14 +58,14 @@ class Film(PydanticBaseModel):
         return self.__root__[item]
 
 
-class LazyFilm(LazyBaseModel):
+class LazyFilm(LazyPydanticBaseModel):
     _model_clazz: Type[PydanticBaseModel] = Film
 
 
 AnyFilm: TypeAlias = Union[LazyFilm, Film]
 
 
-class LazyFilmList(LazyList[AnyFilm]):
+class LazyFilmList(LazyPydanticList[AnyFilm]):
     _model_clazz: Type[list] = List[AnyFilm]
 
 
@@ -81,21 +85,21 @@ class Movie(PydanticBaseModel):
     cast: Dict[str, CastMember] = Field(default_factory=dict)
 
 
-class LazyMovie(LazyBaseModel):
+class LazyMovie(LazyPydanticBaseModel):
     _model_clazz: Type[PydanticBaseModel] = Movie
 
 
 AnyMovie: TypeAlias = Union[LazyMovie, Movie]
 
 
-class LazyMovieList(LazyList[AnyMovie]):
+class LazyMovieList(LazyPydanticList[AnyMovie]):
     _model_clazz: Type[list] = List[AnyMovie]
 
 
 MoviesList: TypeAlias = Union[LazyMovieList, List[AnyMovie]]
 
 
-class LazyMovieDict(LazyDict[str, AnyMovie]):
+class LazyMovieDict(LazyPydanticDict[str, AnyMovie]):
     _model_clazz: Type[dict] = Dict[str, AnyMovie]
 
 
@@ -111,14 +115,14 @@ class Spouse(PydanticBaseModel):
     children: List[str] = Field(default_factory=list)
 
 
-class LazySpouse(LazyBaseModel):
+class LazySpouse(LazyPydanticBaseModel):
     _model_clazz: Type[PydanticBaseModel] = Spouse
 
 
 AnySpouse: TypeAlias = Union[LazySpouse, Spouse]
 
 
-class LazySpouseDict(LazyDict[str, AnySpouse]):
+class LazySpouseDict(LazyPydanticDict[str, AnySpouse]):
     _model_clazz: Type[dict] = Dict[str, AnySpouse]
 
 
@@ -138,14 +142,14 @@ class Actor(PydanticBaseModel):
     spouses: SpousesDict = Field(default_factory=dict)
 
 
-class LazyActor(LazyBaseModel):
+class LazyActor(LazyPydanticBaseModel):
     _model_clazz: Type[PydanticBaseModel] = Actor
 
 
 AnyActor: TypeAlias = Union[LazyActor, Actor]
 
 
-class LazyActorDict(LazyDict[str, AnyActor]):
+class LazyActorDict(LazyPydanticDict[str, AnyActor]):
     _model_clazz: Type[dict] = Dict[str, AnyActor]
 
 
