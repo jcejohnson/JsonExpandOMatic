@@ -180,11 +180,12 @@ class TestPydantic(Fixtures):
             assert "$ref" not in subdata
             for key, subsubdata in subdata.items():
                 assert "$ref" in subsubdata
-                subdata[key] = LessLazyModel.LazyActor(
-                    ref=subsubdata["$ref"],
-                    ctx=None,
-                    root=root.parent,
-                )
+                stuff = subdata[key]
+                subdata[key] = LessLazyModel.LazyActor(**stuff)
+                #     ref=subsubdata["$ref"],
+                #     ctx=None,
+                #     root=root.parent,
+                # )
 
         # parse_obj() currently fails because of LazyBaseThing.data()
         # when `ctx and not root`. I would like to fix it but I'm not
@@ -229,8 +230,8 @@ class TestPydantic(Fixtures):
         contracted = JsonExpandOMatic(path=tmpdir).contract(
             root_element="root",
             lazy=True,
-            contraction_context_class=CountingContractionProxyContext,
-            contraction_proxy_class=CountingContractionProxy,
+            contraction_context_class=PydanticContractionProxyContext,
+            contraction_proxy_class=PydanticContractionProxy,
         )
 
         instance = VeryLazyModel.parse_obj(contracted)
@@ -289,7 +290,8 @@ class TestPydantic(Fixtures):
 
     @pytest.mark.lazy
     def test_less_lazy_load(self, tmpdir, test_data):
-        from .model_less_lazy_with_lazy_pydantic_base_thing import LessLazyModel
+        # from .model_less_lazy_with_lazy_pydantic_base_thing import LessLazyModel
+        from .model_less_lazy_with_lazy_base_thing import LessLazyModel
 
         expanded = JsonExpandOMatic(path=tmpdir).expand(
             test_data,
@@ -315,7 +317,24 @@ class TestPydantic(Fixtures):
             contraction_proxy_class=CountingContractionProxy,
         )
 
-        # breakpoint()
+        from pydantic import parse_obj_as
+
+        # def whacky_validator(v: Any, **kwargs):  # *args, **kwargs):
+        #     breakpoint()
+        #     if issubclass(kwargs["field"].type_, LessLazyModel.LazyActor):
+        #         v = {key[1:] if key.startswith("$") else key: value for key, value in v.items()}
+        #         return v
+        #     raise ClassError()
+        # _VALIDATORS.append((LessLazyModel.LazyActor, [whacky_validator]))
+
+        breakpoint()
+
+        charlie_chaplin = contracted["actors"]["charlie_chaplin"]
+        lazy_actor = parse_obj_as(LessLazyModel.LazyActor, charlie_chaplin)
+        lazy_actor.first_name
+
+        breakpoint()
+
         instance = LessLazyModel.parse_obj(contracted)
         assert instance
 

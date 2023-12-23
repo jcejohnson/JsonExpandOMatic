@@ -162,7 +162,7 @@ class DefaultContractionProxyContext(ContractionProxyContext):
 
         # print(f"_lazy_delayed_contraction parent_key=[{self.parent_key}] path=[{self.path}]")
 
-        assert self.state == ContractionProxyState.waiting
+        assert self.state == ContractionProxyState.waiting, self.state
         self.state = ContractionProxyState.loading
 
         lazy_data = self._contract_now()

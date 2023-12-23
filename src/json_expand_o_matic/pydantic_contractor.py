@@ -2,15 +2,13 @@
 Support for lazy loading into a pydantic model.
 """
 
-import json
 from collections.abc import MutableMapping, MutableSequence
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, ClassVar, Dict, Generic, List, Type, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, Generic, List, Type, TypeVar, Union
 
-from pydantic import BaseModel as PydanticBaseModel
+from peak.util.proxies import LazyWrapper
 from pydantic import Field, parse_obj_as  # type: ignore
 from pydantic.generics import GenericModel as GenericPydanticBaseModel
+from pydantic.validators import _VALIDATORS
 
 from json_expand_o_matic.lazy_contractor import (
     ContractionProxy,
@@ -142,9 +140,10 @@ class LazyPydanticList(LazyPydanticBaseThing[MutableSequence[T]], Generic[T]):
 # Using these requires Config.arbitrary_types_allowed=True
 
 
-@dataclass
-class LazyBaseThing(Generic[T]):  # GenericPydanticBaseModel, Generic[T]):
+class LazyBaseThing(LazyWrapper, Generic[T]):  # GenericPydanticBaseModel, Generic[T]):
     # This might let me use LazyProxy with its more thorough __getattr__ and friends.
+    # Requires lazy_base_thing_validator
+    # Neither this nor subclasses can be a @dataclass (I think).
 
     ref: str
     ctx: int = None  # type: ignore
@@ -154,9 +153,15 @@ class LazyBaseThing(Generic[T]):  # GenericPydanticBaseModel, Generic[T]):
     _data: T = None  # type: ignore
     _container: Any = None  # type: ignore
 
-    def __post_init__(self):
-        assert self.ctx or self.root
+    def __init__(self, *args, **kwargs):
+        for key, value in kwargs.items():
+            object.__setattr__(self, key, value)
+        # We cannot use this callback because it has already been used.
+        # We need to create another callback that behaves like `data()`
+        context = PydanticContractionProxyContext.context_cache[self.ctx]
+        LazyWrapper.__init__(self, func=context.callback)
 
+    """
     @property
     def data(self) -> T:
         if not self._data:
@@ -191,6 +196,20 @@ class LazyBaseThing(Generic[T]):  # GenericPydanticBaseModel, Generic[T]):
 
     def __getattr__(self, name):
         return object.__getattribute__(self.data, name)
+    """
+
+
+def lazy_base_thing_validator(v: Any, **kwargs) -> Any:
+    if issubclass(kwargs["field"].type_, LazyBaseThing):
+        v = {key[1:] if key.startswith("$") else key: value for key, value in v.items()}
+        v = kwargs["field"].type_(**v)
+        return v
+    from pydantic.errors import ClassError
+
+    raise ClassError()
+
+
+_VALIDATORS.append((LazyBaseThing, [lazy_base_thing_validator]))
 
 
 class LazyBaseModel(LazyBaseThing[T], Generic[T]):
