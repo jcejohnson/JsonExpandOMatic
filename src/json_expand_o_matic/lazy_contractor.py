@@ -1,7 +1,7 @@
 import enum
 from dataclasses import dataclass, field
 from functools import partial
-from typing import TYPE_CHECKING, Any, Dict, List, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Union
 
 from peak.util.proxies import LazyProxy  # type: ignore[import-untyped]
 
@@ -89,7 +89,9 @@ class ContractionProxyContext:
         """
         raise NotImplementedError()
 
-    def _delayed_contraction(self) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
+    def _delayed_contraction(
+        self, contract_now: Optional[Callable] = None
+    ) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
         """
         Typically invoked by the ContractionProxy instance returned by self.proxy()
 
@@ -103,7 +105,7 @@ class ContractionProxyContext:
 
             def _delayed_contraction(self):
                 manage state
-                result = self._contract_now()
+                result = contract_now() if contract_now else self._contract_now()
                 finalize state
                 return result
         """
@@ -155,7 +157,9 @@ class DefaultContractionProxyContext(ContractionProxyContext):
         proxy = self.contraction_proxy_class(callback=self.callback)
         return proxy
 
-    def _delayed_contraction(self) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
+    def _delayed_contraction(
+        self, contract_now: Optional[Callable] = None
+    ) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
         """
         Uses our superclass' context to invoke Contractor._eager_contraction()
         """
@@ -165,7 +169,7 @@ class DefaultContractionProxyContext(ContractionProxyContext):
         assert self.state == ContractionProxyState.waiting, self.state
         self.state = ContractionProxyState.loading
 
-        lazy_data = self._contract_now()
+        lazy_data = contract_now() if contract_now else self._contract_now()
 
         # Replace the ContractionProxy instance with the lazy-loaded data.
         if self.parent:

@@ -67,7 +67,7 @@ class Film(PydanticBaseModel):
         return self.__root__[item]
 
 
-class LazyFilm(LazyBaseModel):
+class LazyFilm(LazyBaseModel[Film]):
     _model_clazz: Type[PydanticBaseModel] = Film
 
 
@@ -96,7 +96,7 @@ class Movie(PydanticBaseModel):
     cast: Dict[str, CastMember] = Field(default_factory=dict, description="/root/actors/[^/]+/movies/[^/]+/cast")
 
 
-class LazyMovie(LazyBaseModel):
+class LazyMovie(LazyBaseModel[Movie]):
     _model_clazz: Type[PydanticBaseModel] = Movie
 
 
@@ -116,7 +116,7 @@ class Spouse(PydanticBaseModel):
     children: List[str] = Field(default_factory=list, description="/root/actors/[^/]+/spouses/[^/]+/children")
 
 
-class LazySpouse(LazyBaseModel):
+class LazySpouse(LazyBaseModel[Spouse]):
     _model_clazz: Type[PydanticBaseModel] = Spouse
 
 
@@ -144,7 +144,7 @@ class Actor(PydanticBaseModel):
     spouses: SpousesDict = Field(default_factory=dict, description="/root/actors/[^/]+/spouses")
 
 
-class LazyActor(LazyBaseModel):
+class LazyActor(LazyBaseModel[Actor]):
     _model_clazz: Type[PydanticBaseModel] = Actor
 
 

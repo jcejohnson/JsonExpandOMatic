@@ -310,11 +310,13 @@ class TestPydantic(Fixtures):
 
         reset_counters()
 
+        breakpoint()
+
         contracted = JsonExpandOMatic(path=tmpdir).contract(
             root_element="root",
             lazy=True,
-            contraction_context_class=CountingContractionProxyContext,
-            contraction_proxy_class=CountingContractionProxy,
+            contraction_context_class=PydanticContractionProxyContext,
+            contraction_proxy_class=PydanticContractionProxy,
         )
 
         from pydantic import parse_obj_as
@@ -331,6 +333,8 @@ class TestPydantic(Fixtures):
 
         charlie_chaplin = contracted["actors"]["charlie_chaplin"]
         lazy_actor = parse_obj_as(LessLazyModel.LazyActor, charlie_chaplin)
+
+        breakpoint()
         lazy_actor.first_name
 
         breakpoint()
