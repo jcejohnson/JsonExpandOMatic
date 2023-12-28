@@ -43,7 +43,7 @@ class PydanticContractionProxyContext(DefaultContractionProxyContext):
 
     model_clazz: Type[PydanticBaseModel] = None  # type: ignore
 
-    secondary_state: ContractionProxyState = ContractionProxyState.waiting
+    model_state: ContractionProxyState = ContractionProxyState.waiting
 
     context_cache: ClassVar[Dict[int, "PydanticContractionProxyContext"]] = dict()
 
@@ -52,22 +52,22 @@ class PydanticContractionProxyContext(DefaultContractionProxyContext):
         return result
 
     def _delayed_contraction(
-        self, contract_now: Optional[Callable]
+        self, contract_now: Optional[Callable] = None
     ) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
-        breakpoint()
+        # breakpoint()
 
         waiting = ContractionProxyState.waiting
         ready = ContractionProxyState.ready
 
-        assert (self.state == waiting and self.secondary_state == waiting) or (
-            self.state == ready and self.secondary_state == waiting
+        assert (self.state == waiting and self.model_state == waiting) or (
+            self.state == ready and self.model_state == waiting
         )
 
         if self.state == waiting:
             result = super()._delayed_contraction(contract_now=contract_now)
 
-        elif self.secondary_state == waiting:
-            result = self._secondary_delayed_contraction()
+        elif self.model_state == waiting:
+            result = self._model_delayed_contraction()
 
         else:
             if TYPE_CHECKING:
@@ -76,7 +76,7 @@ class PydanticContractionProxyContext(DefaultContractionProxyContext):
         return result
 
     def _contract_now(self):
-        breakpoint()
+        # breakpoint()
         assert isinstance(self, PydanticContractionProxyContext)
         assert self.state == ContractionProxyState.loading
 
@@ -86,22 +86,27 @@ class PydanticContractionProxyContext(DefaultContractionProxyContext):
 
         return result
 
-    def _secondary_delayed_contraction(self) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
-        breakpoint()
+    def _model_delayed_contraction(self) -> Union[List[Any], Dict[Any, Any], ContractionProxy]:
+        # breakpoint()
 
-        self.state = self.secondary_state
-        result = self._delayed_contraction(contract_now=self._secondary_contract_now)
-        self.secondary_state = self.state
+        self.state = self.model_state
+        result = self._delayed_contraction(contract_now=self._model_contract_now)
+        self.model_state = self.state
 
         return result
 
-    def _secondary_contract_now(self):
-        breakpoint()
+    def _model_contract_now(self):
+        # breakpoint()
 
         # Load the data
         data = super()._contract_now()
         assert not isinstance(data, ContractionProxy)
         assert isinstance(data, dict)
+
+        print()
+        print("HELLO WORLD")
+        print(self.model_clazz)
+        # breakpoint()
 
         # Construct the model
         instance = self.model_clazz(**data)
@@ -206,18 +211,18 @@ class LazyBaseThing(LazyWrapper, Generic[T]):  # GenericPydanticBaseModel, Gener
     # Requires lazy_base_thing_validator
     # Neither this nor subclasses can be a @dataclass (I think).
 
-    ref: str
-    ctx: int = None  # type: ignore
+    _ref: str
+    _ctx: int = None  # type: ignore
 
     _model_clazz: Type[T] = None  # type: ignore
 
     def __init__(self, *args, **kwargs):
         for key, value in kwargs.items():
             object.__setattr__(self, key, value)
-        breakpoint()
+        # breakpoint()
         # We cannot use this callback because it has already been used.
         # We need to create another callback that behaves like `data()`
-        context = PydanticContractionProxyContext.context_cache[self.ctx]
+        context = PydanticContractionProxyContext.context_cache[self._ctx]
         context.model_clazz = self._model_clazz
         LazyWrapper.__init__(self, func=context.callback)
 
@@ -260,14 +265,20 @@ class LazyBaseThing(LazyWrapper, Generic[T]):  # GenericPydanticBaseModel, Gener
 
 
 def lazy_base_thing_validator(v: Any, **kwargs) -> Any:
-    breakpoint()
-    if issubclass(kwargs["field"].type_, LazyBaseThing):
-        v = {key[1:] if key.startswith("$") else key: value for key, value in v.items()}
-        v = kwargs["field"].type_(**v)
+    # breakpoint()
+    # if kwargs["field"].type_.__name__.endswith("Actor"):
+    #     print()
+    #     print(type(v))
+    #     print(kwargs["field"].type_)
+    #     breakpoint()
+    #     ...
+    if not issubclass(type(v), PydanticContractionProxy):
         return v
-    from pydantic.errors import ClassError
-
-    raise ClassError()
+    if not issubclass(kwargs["field"].type_, LazyBaseThing):
+        return v
+    v = {f"_{key[1:]}" if key.startswith("$") else key: value for key, value in v.items()}
+    v = kwargs["field"].type_(**v)
+    return v
 
 
 _VALIDATORS.append((LazyBaseThing, [lazy_base_thing_validator]))

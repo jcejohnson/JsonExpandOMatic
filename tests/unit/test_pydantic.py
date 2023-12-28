@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Union, cast
 import pytest
 
 from json_expand_o_matic import JsonExpandOMatic
+from json_expand_o_matic.lazy_contractor import ContractionProxyState
 from json_expand_o_matic.pydantic_contractor import (
     ContractionProxy,
     LazyPydanticBaseModel,
@@ -289,7 +290,7 @@ class TestPydantic(Fixtures):
         ...
 
     @pytest.mark.lazy
-    def test_less_lazy_load(self, tmpdir, test_data):
+    def test_basic_less_lazy_load(self, tmpdir, test_data):
         # from .model_less_lazy_with_lazy_pydantic_base_thing import LessLazyModel
         from .model_less_lazy_with_lazy_base_thing import LessLazyModel
 
@@ -310,7 +311,7 @@ class TestPydantic(Fixtures):
 
         reset_counters()
 
-        breakpoint()
+        # breakpoint()
 
         contracted = JsonExpandOMatic(path=tmpdir).contract(
             root_element="root",
@@ -328,18 +329,163 @@ class TestPydantic(Fixtures):
         #         return v
         #     raise ClassError()
         # _VALIDATORS.append((LessLazyModel.LazyActor, [whacky_validator]))
+        # breakpoint()
 
-        breakpoint()
+        assert isinstance(contracted, dict)
+        assert isinstance(contracted["actors"], dict)
 
         charlie_chaplin = contracted["actors"]["charlie_chaplin"]
+        assert isinstance(contracted["actors"]["charlie_chaplin"], PydanticContractionProxy)
+
         lazy_actor = parse_obj_as(LessLazyModel.LazyActor, charlie_chaplin)
 
-        breakpoint()
+        # breakpoint()
         lazy_actor.first_name
 
-        breakpoint()
+        # breakpoint()
 
         instance = LessLazyModel.parse_obj(contracted)
         assert instance
+
+        # breakpoint()
+        ...
+
+    @pytest.mark.lazy
+    def test_less_lazy_load(self, tmpdir, test_data):
+        # from .model_less_lazy_with_lazy_pydantic_base_thing import LessLazyModel
+        from .model_less_lazy_with_lazy_base_thing import (
+            Actor,
+            LazyActor,
+            LessLazyModel,
+        )
+
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            json_dump_kwargs={"indent": 2, "sort_keys": True},
+            leaf_nodes=LessLazyModel.EXPANSION_RULES,
+        )
+        assert expanded == {"root": {"$ref": f"{tmpdir.basename}/root.json"}}
+
+        # breakpoint()
+
+        expanded = cast(Dict[str, Dict[str, str]], expanded)
+        root = pathlib.Path(tmpdir.dirname, expanded["root"]["$ref"])
+        assert root
+
+        reset_counters()
+
+        # breakpoint()
+
+        contracted = JsonExpandOMatic(path=tmpdir).contract(
+            root_element="root",
+            lazy=True,
+            contraction_context_class=PydanticContractionProxyContext,
+            contraction_proxy_class=PydanticContractionProxy,
+        )
+
+        assert isinstance(contracted, dict)
+        assert isinstance(contracted["actors"], dict)
+
+        charlie_chaplin = contracted["actors"]["charlie_chaplin"]
+        assert charlie_chaplin is contracted["actors"]["charlie_chaplin"]
+        assert isinstance(charlie_chaplin, PydanticContractionProxy)
+        # Nothing has changed, no proxies were triggered.
+        assert charlie_chaplin is contracted["actors"]["charlie_chaplin"]
+
+        # breakpoint()
+
+        instance = LessLazyModel.parse_obj(contracted)
+        assert instance
+
+        #
+        # After loading we generally won't use `contracted` but it is important
+        # to understand what has happened to it.
+        #
+
+        assert not (charlie_chaplin is contracted["actors"]["charlie_chaplin"])
+        assert isinstance(charlie_chaplin, PydanticContractionProxy)
+
+        # The proxy in contracted["actors"] has been replaced with the json data
+        assert not isinstance(contracted["actors"]["charlie_chaplin"], PydanticContractionProxy)
+        assert isinstance(contracted["actors"]["charlie_chaplin"], dict)
+        assert set(contracted["actors"]["charlie_chaplin"].keys()) == {"$ref", "$ctx"}
+        assert contracted["actors"]["charlie_chaplin"]["$ref"] == "root/actors/charlie_chaplin.json"
+        assert isinstance(contracted["actors"]["charlie_chaplin"]["$ctx"], int)
+
+        #
+        # Inspect the proxy context.
+        # This is the glue between the raw json data, the lazy model and the complete model.
+        #
+
+        cid = contracted["actors"]["charlie_chaplin"]["$ctx"]
+        context = PydanticContractionProxyContext.context_cache[cid]
+        assert isinstance(context, PydanticContractionProxyContext)
+        assert id(context) == cid
+
+        # json file has been loaded (that's how we get the `contracted["actors"]["charlie_chaplin"]` dict)
+        assert context.state == ContractionProxyState.ready
+        # The json/dict has not yet been converted to a non-lazy model because we haven't requested any attributes.
+        assert context.model_state == ContractionProxyState.waiting
+
+        #
+        # What we're more interested in is `instance`
+        #
+
+        assert set(instance.actors.keys()) == {"charlie_chaplin", "dwayne_johnson"}
+
+        charlie_chaplin = instance.actors["charlie_chaplin"]
+        assert charlie_chaplin is instance.actors["charlie_chaplin"]
+        assert isinstance(charlie_chaplin, LazyActor)
+
+        # Nothing has changed, no proxies were triggered.
+        assert charlie_chaplin is instance.actors["charlie_chaplin"]
+        assert (context.state, context.model_state) == (ContractionProxyState.ready, ContractionProxyState.waiting)
+
+        # LazyActor subclasses LazyBaseThing which subclasses LazyWrapper.
+        # Accessing attributes of LazyActor and LazyBaseThing won't trigger the proxy.
+        assert charlie_chaplin._model_clazz is Actor
+        assert charlie_chaplin._ref == "root/actors/charlie_chaplin.json"
+        assert isinstance(charlie_chaplin._ctx, int)
+
+        assert id(context) == charlie_chaplin._ctx
+
+        # Nothing has changed, no proxies were triggered.
+        assert charlie_chaplin is instance.actors["charlie_chaplin"]
+        assert (context.state, context.model_state) == (ContractionProxyState.ready, ContractionProxyState.waiting)
+
+        # Let's trigger some proxies.
+
+        assert isinstance(contracted["actors"]["charlie_chaplin"], dict)  # Before secondary contraction.
+
+        first_name = charlie_chaplin.first_name
+        assert first_name == "Charlie"
+
+        # secondary proxy has fired.
+        assert (context.state, context.model_state) == (ContractionProxyState.ready, ContractionProxyState.ready)
+
+        # The secondary proxy doesn't know how to replace the LazyActor with the Actor in `instance.actors`
+        # FIXME: How can I update the context's parent/key so that this happens?
+        assert charlie_chaplin is instance.actors["charlie_chaplin"]
+        assert isinstance(charlie_chaplin, LazyActor)
+
+        # But the secondary proxy _does_ know how to replace the LazyActor with the Actor in `contracated`
+        assert isinstance(contracted["actors"]["charlie_chaplin"], Actor)
+
+        movies = charlie_chaplin.movies
+        assert isinstance(movies, dict)
+
+        # breakpoint()
+
+        dwayne_johnson = instance.actors["dwayne_johnson"]
+
+        # This fails with "KeyError: 0" because movies is a list.
+        # FIXME: Start here
+        first_name = dwayne_johnson.first_name
+        assert dwayne_johnson.first_name == "Dwayne"
+
+        movies = dwayne_johnson.movies
+        assert isinstance(movies, list)
 
         ...

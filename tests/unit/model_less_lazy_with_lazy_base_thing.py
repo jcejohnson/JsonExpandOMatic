@@ -103,7 +103,12 @@ class LazyMovie(LazyBaseModel[Movie]):
 AnyMovie: TypeAlias = Union[LazyMovie, Movie]
 MoviesList: TypeAlias = List[AnyMovie]
 MoviesDict: TypeAlias = Dict[str, AnyMovie]
-MoviesCollection: TypeAlias = Union[MoviesDict, MoviesList]
+
+# This will cause lazy loading to fail with `"KeyError: 0"` when the raw data is a list.
+# MoviesCollection: TypeAlias = Union[MoviesDict, MoviesList]
+
+# This allows lazy loading to succeed but I don't like the constraint.
+MoviesCollection: TypeAlias = Union[MoviesList, MoviesDict]
 
 
 class Spouse(PydanticBaseModel):
