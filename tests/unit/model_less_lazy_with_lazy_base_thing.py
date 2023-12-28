@@ -51,6 +51,14 @@ class CastMember(PydanticBaseModel):
     name: str
 
 
+class LazyCastMember(LazyBaseModel[CastMember]):
+    _model_clazz: Type[PydanticBaseModel] = CastMember
+
+
+AnyCastMember: TypeAlias = Union[LazyCastMember, CastMember]
+CastMembersDict: TypeAlias = Dict[str, AnyCastMember]
+
+
 class Film(PydanticBaseModel):
     """
     /root/actors/[^/]+/filmography/[^/]+
@@ -93,7 +101,7 @@ class Movie(PydanticBaseModel):
     title: str
     year: int = 0
 
-    cast: Dict[str, CastMember] = Field(default_factory=dict, description="/root/actors/[^/]+/movies/[^/]+/cast")
+    cast: CastMembersDict = Field(default_factory=dict, description="/root/actors/[^/]+/movies/[^/]+/cast")
 
 
 class LazyMovie(LazyBaseModel[Movie]):

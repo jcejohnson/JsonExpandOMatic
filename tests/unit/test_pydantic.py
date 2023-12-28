@@ -226,8 +226,6 @@ class TestPydantic(Fixtures):
         expanded = cast(Dict[str, Dict[str, str]], default_expansion)
         root = pathlib.Path(tmpdir.dirname, expanded["root"]["$ref"])
 
-        reset_counters()
-
         contracted = JsonExpandOMatic(path=tmpdir).contract(
             root_element="root",
             lazy=True,
@@ -309,8 +307,6 @@ class TestPydantic(Fixtures):
         root = pathlib.Path(tmpdir.dirname, expanded["root"]["$ref"])
         assert root
 
-        reset_counters()
-
         # breakpoint()
 
         contracted = JsonExpandOMatic(path=tmpdir).contract(
@@ -352,7 +348,6 @@ class TestPydantic(Fixtures):
 
     @pytest.mark.lazy
     def test_less_lazy_load(self, tmpdir, test_data):
-        # from .model_less_lazy_with_lazy_pydantic_base_thing import LessLazyModel
         from .model_less_lazy_with_lazy_base_thing import (
             Actor,
             LazyActor,
@@ -373,8 +368,6 @@ class TestPydantic(Fixtures):
         expanded = cast(Dict[str, Dict[str, str]], expanded)
         root = pathlib.Path(tmpdir.dirname, expanded["root"]["$ref"])
         assert root
-
-        reset_counters()
 
         # breakpoint()
 
@@ -488,4 +481,43 @@ class TestPydantic(Fixtures):
         movies = dwayne_johnson.movies
         assert isinstance(movies, list)
 
-        ...
+    @pytest.mark.lazy
+    def test_less_lazy_to_dict(self, tmpdir, test_data):
+        from .model_less_lazy_with_lazy_base_thing import LessLazyModel
+
+        expanded = JsonExpandOMatic(path=tmpdir).expand(
+            test_data,
+            root_element="root",
+            preserve=False,
+            json_dump_kwargs={"indent": 2, "sort_keys": True},
+            leaf_nodes=LessLazyModel.EXPANSION_RULES,
+        )
+
+        expanded = cast(Dict[str, Dict[str, str]], expanded)
+
+        contracted = JsonExpandOMatic(path=tmpdir).contract(
+            root_element="root",
+            lazy=True,
+            contraction_context_class=PydanticContractionProxyContext,
+            contraction_proxy_class=PydanticContractionProxy,
+        )
+
+        instance = LessLazyModel.parse_obj(contracted)
+
+        # breakpoint()
+
+        assert isinstance(instance.actors["dwayne_johnson"].movies, list)
+        movie_0 = instance.actors["dwayne_johnson"].movies[0]
+
+        # This will trigger a load which _was_ failing because Movie needs a
+        # CastMembersDict which can be CastMember or LazyCastMember.
+        assert not isinstance(movie_0, str)
+
+        # breakpoint()
+        data = instance.dict()
+        assert isinstance(data, dict)
+
+        blob = instance.json()
+        assert isinstance(blob, str)
+
+        # TODO: Verify that expansion of `instance` is equivalent to the original expansion.

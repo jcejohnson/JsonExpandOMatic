@@ -42,7 +42,7 @@ class PydanticContractionProxyContext(DefaultContractionProxyContext):
     """
 
     model_clazz: Type[PydanticBaseModel] = None  # type: ignore
-
+    model_instance: PydanticBaseModel = None  # type: ignore
     model_state: ContractionProxyState = ContractionProxyState.waiting
 
     context_cache: ClassVar[Dict[int, "PydanticContractionProxyContext"]] = dict()
@@ -98,20 +98,22 @@ class PydanticContractionProxyContext(DefaultContractionProxyContext):
     def _model_contract_now(self):
         # breakpoint()
 
+        # print()
+        # print("HELLO WORLD")
+        # print(self.model_clazz)
+        # if self.model_clazz.__name__ == "Movie":
+        #     breakpoint()
+
         # Load the data
         data = super()._contract_now()
         assert not isinstance(data, ContractionProxy)
-        assert isinstance(data, dict)
 
-        print()
-        print("HELLO WORLD")
-        print(self.model_clazz)
         # breakpoint()
 
         # Construct the model
-        instance = self.model_clazz(**data)
+        self.model_instance = self.model_clazz.parse_obj(data)
 
-        return instance
+        return self.model_instance
 
 
 class PydanticContractionProxy(DefaultContractionProxy):
@@ -226,42 +228,14 @@ class LazyBaseThing(LazyWrapper, Generic[T]):  # GenericPydanticBaseModel, Gener
         context.model_clazz = self._model_clazz
         LazyWrapper.__init__(self, func=context.callback)
 
-    """
-    @property
-    def data(self) -> T:
-        if not self._data:
-            assert self.ctx or self.root, (
-                "Missing PydanticContractionProxyContext identifier. "
-                "Did you forget to use PydanticContractionProxy* objects during contract()?"
-            )
-            if self.ctx:
-                context = PydanticContractionProxyContext.context_cache[self.ctx]
-                raw_data = context._contract_now()
-                raw_data = self._pre_parse_obj_as(context, raw_data)
-                self._data = parse_obj_as(self._model_clazz, raw_data)
-                self._post_parse_obj_as(context, raw_data)
-            elif self.root:
-                path = Path(self.root, self.ref)
-                with open(path) as f:
-                    data = json.load(f)
-                assert self._model_clazz
-                assert issubclass(self._model_clazz, PydanticBaseModel)
-                # This will fail unless we iterate through attributes that are
-                # list/dict and replace `$ref`` with `ref`` _and_ add `root`.
-                # I'm not sure this is worth pursuing just to leverage LazyProxy.
-                self._data = cast(T, self._model_clazz.parse_obj(data))
-
-        return self._data
-
-    def _pre_parse_obj_as(self, context: PydanticContractionProxyContext, raw_data):
-        return raw_data
-
-    def _post_parse_obj_as(self, context: PydanticContractionProxyContext, raw_data):
-        return
-
-    def __getattr__(self, name):
-        return object.__getattribute__(self.data, name)
-    """
+    def dict(self, *args, **kwargs):
+        context = PydanticContractionProxyContext.context_cache[self._ctx]
+        if context.model_state == ContractionProxyState.waiting:
+            return {"$ref": self._ref, "$ctx": self._ctx}
+        # if str(type(context.model_instance).__name__) == "Actor":
+        #     breakpoint()
+        data = context.model_instance.dict(*args, **kwargs)
+        return data
 
 
 def lazy_base_thing_validator(v: Any, **kwargs) -> Any:
@@ -273,8 +247,10 @@ def lazy_base_thing_validator(v: Any, **kwargs) -> Any:
     #     breakpoint()
     #     ...
     if not issubclass(type(v), PydanticContractionProxy):
+        print(f"not issubclass(type(v), PydanticContractionProxy) -> [{type(v)}]")
         return v
     if not issubclass(kwargs["field"].type_, LazyBaseThing):
+        print(f"not issubclass(kwargs['field'].type_, LazyBaseThing) -> [{type(v)}]")
         return v
     v = {f"_{key[1:]}" if key.startswith("$") else key: value for key, value in v.items()}
     v = kwargs["field"].type_(**v)
